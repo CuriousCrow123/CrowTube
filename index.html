@@ -21,7 +21,14 @@ body::before {
               radial-gradient(ellipse at 70% 80%, rgba(255,138,92,.04) 0%, transparent 50%);
   pointer-events: none; z-index: 0;
 }
-.app { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 40px 24px 60px; }
+.app { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 40px 24px 60px; }
+.main-layout { display: flex; gap: 20px; }
+.main-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+.main-left .pc, .main-left .ctrl { margin-bottom: 0; }
+.main-right { width: 340px; flex-shrink: 0; }
+.main-right .pls { display: flex; flex-direction: column; }
+.main-right .pli { overflow-y: auto; }
+.st-wrap { margin-top: 20px; margin-right: calc(340px + 20px); }
 
 /* ── Header / Logo ── */
 header { text-align: center; margin-bottom: 36px; }
@@ -154,10 +161,10 @@ header { text-align: center; margin-bottom: 36px; }
 .ti::placeholder { color: var(--dim); }
 
 /* ── Playlist ── */
-.pls { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.pls { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
 .plh { padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
 .plt { font-family: 'DM Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); }
-.pli { max-height: 300px; overflow-y: auto; }
+.pli { overflow-y: auto; }
 .pli::-webkit-scrollbar { width: 4px; }
 .pli::-webkit-scrollbar-track { background: transparent; }
 .pli::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
@@ -175,14 +182,22 @@ header { text-align: center; margin-bottom: 36px; }
   background: rgba(255,77,106,.08); border: 1px solid rgba(255,77,106,.15);
   border-radius: 6px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0;
 }
-.pi .rm {
-  opacity: 0; color: var(--dim); font-size: 18px; background: none; border: none;
+.rng-x {
+  margin-left: 4px; cursor: pointer; opacity: 0.4; font-size: 11px;
+  transition: opacity .15s;
+}
+.rng-x:hover { opacity: 1; }
+.pi .rm, .pi .cp {
+  opacity: 0; color: var(--dim); background: none; border: none;
   cursor: pointer; transition: opacity .15s; padding: 0 4px;
 }
-.pi:hover .rm { opacity: 1; }
-.pi .rm:hover { color: var(--accent); }
+.pi:hover .rm, .pi:hover .cp { opacity: 1; }
+.pi .rm:hover, .pi .cp:hover { color: var(--accent); }
+.pi .rm { font-size: 18px; }
+.pi .cp { font-size: 13px; }
 .ep { padding: 32px; text-align: center; color: var(--dim); font-size: 13px; }
-.st { text-align: center; margin-top: 20px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--dim); }
+.st { text-align: center; margin-top: 20px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--dim); transition: opacity 0.3s ease; }
+.st.fade-out { opacity: 0; }
 .toast {
   position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
   background: var(--surface); border: 1px solid var(--accent); border-radius: 10px;
@@ -239,6 +254,13 @@ header { text-align: center; margin-bottom: 36px; }
 .file-warning-box .steps { text-align: left; color: var(--dim); font-size: 13px; line-height: 2; margin-bottom: 20px; }
 .file-warning-box .steps span { color: var(--accent); font-weight: 600; }
 
+@media (max-width: 900px) {
+  .main-layout { flex-direction: column; }
+  .main-left { gap: 20px; }
+  .main-right { width: 100%; }
+  .main-right .pli { max-height: 300px; }
+  .st-wrap { margin-right: 0; }
+}
 @media (max-width: 600px) {
   .app { padding: 24px 16px 40px; }
   .ig { flex-direction: column; }
@@ -289,59 +311,62 @@ header { text-align: center; margin-bottom: 36px; }
     <button class="b bs" id="queueBtn">+ Queue</button>
   </div>
 
-  <div class="pc">
-    <div class="pw" id="pw">
-      <div id="pt-target"></div>
-      <div class="ph" id="ph">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
-        </svg>
-        Paste a URL above to get started
+  <div class="main-layout">
+    <div class="main-left">
+      <div class="pc">
+        <div class="pw" id="pw">
+          <div id="pt-target"></div>
+          <div class="ph" id="ph">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+            </svg>
+            Paste a URL above to get started
+          </div>
+        </div>
+      </div>
+      <div class="ctrl">
+        <div class="cr">
+          <button class="b bs bsm" id="loopBtn">&#8635; Loop: ON</button>
+          <div class="lb" id="lc"><span class="inf">&#8734;</span> loops</div>
+          <div class="sep"></div>
+          <button class="b bs bsm" id="shuffleBtn">&#9876; Shuffle: OFF</button>
+          <div class="sep"></div>
+          <div class="rain-wrap">
+            <button class="b bs bsm" id="rainBtn">&#127783; Rain</button>
+            <input type="range" class="rain-vol" id="rainVol" min="0" max="100" value="30" />
+          </div>
+          <div class="sep"></div>
+          <button class="b bs bsm" id="restartBtn">&#8634; Restart</button>
+          <button class="b bs bsm" id="nextBtn">Next &#9658;</button>
+        </div>
+        <div class="ts">
+          <div class="tsl">Play Range</div>
+          <div class="tsi">
+            <input type="text" class="ti" id="sTime" placeholder="0:00" />
+            <span style="color:var(--dim);font-size:18px">&#8594;</span>
+            <input type="text" class="ti" id="eTime" placeholder="end" />
+            <button class="b bs bsm" id="setRangeBtn">Set Trim</button>
+            <button class="b bs bsm" id="clrRangeBtn">Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="main-right">
+      <div class="pls">
+        <div class="plh">
+          <span class="plt">Queue</span>
+          <div style="display:flex;gap:8px">
+            <button class="b share-btn" id="shareBtn">&#128279; Share Queue</button>
+            <button class="b bs bsm" id="clrAllBtn">Clear All</button>
+          </div>
+        </div>
+        <div class="pli" id="plc">
+          <div class="ep">No videos in queue &#8212; add some!</div>
+        </div>
       </div>
     </div>
   </div>
-
-  <div class="ctrl">
-    <div class="cr">
-      <button class="b bs bsm" id="loopBtn">&#8635; Loop: ON</button>
-      <div class="lb" id="lc"><span class="inf">&#8734;</span> loops</div>
-      <div class="sep"></div>
-      <button class="b bs bsm" id="shuffleBtn">&#9876; Shuffle: OFF</button>
-      <div class="sep"></div>
-      <div class="rain-wrap">
-        <button class="b bs bsm" id="rainBtn">&#127783; Rain</button>
-        <input type="range" class="rain-vol" id="rainVol" min="0" max="100" value="30" />
-      </div>
-      <div class="sep"></div>
-      <button class="b bs bsm" id="restartBtn">&#8634; Restart</button>
-      <button class="b bs bsm" id="nextBtn">Next &#9658;</button>
-    </div>
-    <div class="ts">
-      <div class="tsl">Loop Range (optional)</div>
-      <div class="tsi">
-        <input type="text" class="ti" id="sTime" placeholder="0:00" />
-        <span style="color:var(--dim);font-size:18px">&#8594;</span>
-        <input type="text" class="ti" id="eTime" placeholder="end" />
-        <button class="b bs bsm" id="setRangeBtn">Set Range</button>
-        <button class="b bs bsm" id="clrRangeBtn">Clear</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="pls">
-    <div class="plh">
-      <span class="plt">Queue</span>
-      <div style="display:flex;gap:8px">
-        <button class="b share-btn" id="shareBtn">&#128279; Share Queue</button>
-        <button class="b bs bsm" id="clrAllBtn">Clear All</button>
-      </div>
-    </div>
-    <div class="pli" id="plc">
-      <div class="ep">No videos in queue &#8212; add some!</div>
-    </div>
-  </div>
-
-  <div class="st" id="st">Ready</div>
+  <div class="st-wrap"><div class="st" id="st">Ready</div></div>
 </div>
 <div class="toast" id="toast"></div>
 <canvas id="rainCanvas" class="rain-canvas"></canvas>
@@ -391,6 +416,7 @@ header { text-align: center; margin-bottom: 36px; }
 
   /* ── State ── */
   var P = null, loop = true, shuffle = false, lc = 0, pl = [], ci = -1, ls = null, le = null, rci = null;
+  var shufflePlayed = {}; // track indices played this shuffle round
   var rainAudio = null, rainOn = false, rainVol = 0.3;
   var KEY = "crowtube";
 
@@ -667,7 +693,7 @@ header { text-align: center; margin-bottom: 36px; }
             setVizActive(true);
             advancing = false;
             rcStopping = false;
-            if (ci >= 0 && pl[ci]) ss("Playing: " + pl[ci].title);
+            if (ci >= 0 && pl[ci]) ss("Playing: " + pl[ci].title, true);
             startRC();
           } else if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.BUFFERING) {
             setVizActive(false);
@@ -677,6 +703,27 @@ header { text-align: center; margin-bottom: 36px; }
       }
     });
   };
+
+  function shufflePick() {
+    // Get unplayed indices (excluding current)
+    var remaining = [];
+    for (var j = 0; j < pl.length; j++) {
+      if (j !== ci && !shufflePlayed[j]) remaining.push(j);
+    }
+    if (remaining.length === 0) {
+      // All played — new round
+      if (loop) {
+        lc++; ub();
+        shufflePlayed = {};
+        for (var j = 0; j < pl.length; j++) {
+          if (j !== ci) remaining.push(j);
+        }
+      } else {
+        return -1; // queue finished
+      }
+    }
+    return remaining[Math.floor(Math.random() * remaining.length)];
+  }
 
   var advancing = false;
   function advanceQueue() {
@@ -689,9 +736,13 @@ header { text-align: center; margin-bottom: 36px; }
       if (loop) { goS(); P.playVideo(); lc++; ub(); }
       else { P.seekTo(le || P.getDuration(), true); P.pauseVideo(); advancing = false; ss("Queue finished"); setVizActive(false); }
     } else if (shuffle) {
-      var pick = ci;
-      while (pick === ci && pl.length > 1) pick = Math.floor(Math.random() * pl.length);
-      window.playIdx(pick);
+      var pick = shufflePick();
+      if (pick === -1) {
+        P.seekTo(le || P.getDuration(), true); P.pauseVideo(); advancing = false; ss("Queue finished"); setVizActive(false);
+      } else {
+        shufflePlayed[ci] = true;
+        window.playIdx(pick);
+      }
     } else {
       var nxt = ci + 1;
       if (nxt < pl.length) {
@@ -719,6 +770,7 @@ header { text-align: center; margin-bottom: 36px; }
           if (!loop) {
             if (pl.length <= 1) shouldStop = true;
             else if (!shuffle && ci + 1 >= pl.length) shouldStop = true;
+            else if (shuffle && shufflePick() === -1) shouldStop = true;
           }
           if (shouldStop) {
             rcStopping = true;
@@ -782,7 +834,6 @@ header { text-align: center; margin-bottom: 36px; }
     var input = document.getElementById("urlInput").value;
     var id = vid(input);
     if (!id) { ss("Invalid YouTube URL"); return; }
-    for (var i = 0; i < pl.length; i++) { if (pl[i].id === id) { ss("Already in queue"); return; } }
     var idx = pl.length;
     pl.push({ id: id, title: "Video " + id, start: null, end: null });
     rpl(); ss("Added to queue");
@@ -803,8 +854,9 @@ header { text-align: center; margin-bottom: 36px; }
   function doNext() {
     if (!pl.length) return;
     if (shuffle && pl.length > 1) {
-      var pick = ci;
-      while (pick === ci) pick = Math.floor(Math.random() * pl.length);
+      shufflePlayed[ci] = true;
+      var pick = shufflePick();
+      if (pick === -1) { shufflePlayed = {}; pick = Math.floor(Math.random() * pl.length); }
       window.playIdx(pick, true);
     } else {
       window.playIdx((ci + 1) % pl.length, true);
@@ -817,12 +869,41 @@ header { text-align: center; margin-bottom: 36px; }
     rpl();
   };
 
+  window.copyLink = function(i) {
+    if (i < 0 || i >= pl.length) return;
+    var v = pl[i];
+    var url = "https://youtu.be/" + v.id;
+    navigator.clipboard.writeText(url).then(function() {
+      showToast("YouTube link copied!");
+    }).catch(function() {
+      showToast("Couldn\u2019t copy \u2014 check console");
+      console.log("Link:", url);
+    });
+  };
+
+  window.clearTrim = function(i) {
+    if (i < 0 || i >= pl.length) return;
+    pl[i].start = null;
+    pl[i].end = null;
+    if (i === ci) { ls = null; le = null; stopRC(); }
+    rpl();
+    ssTemp("Cleared play range for " + pl[i].title);
+  };
+
   function doClrAll() { pl = []; ci = -1; rpl(); saveState(); }
+
+  function syncQueueHeight() {
+    var left = document.querySelector(".main-left");
+    var pls = document.querySelector(".main-right .pls");
+    if (!left || !pls) return;
+    pls.style.height = left.offsetHeight + "px";
+  }
+  window.addEventListener("resize", syncQueueHeight);
 
   function rpl() {
     saveState();
     var c = document.getElementById("plc");
-    if (!pl.length) { c.innerHTML = '<div class="ep">No videos in queue &#8212; add some!</div>'; return; }
+    if (!pl.length) { c.innerHTML = '<div class="ep">No videos in queue &#8212; add some!</div>'; syncQueueHeight(); return; }
     var h = "";
     for (var i = 0; i < pl.length; i++) {
       var hasRange = pl[i].start !== null || pl[i].end !== null;
@@ -830,27 +911,43 @@ header { text-align: center; margin-bottom: 36px; }
       h += '<span class="ix">' + String(i + 1).padStart(2, "0") + '</span>';
       h += '<span class="tt">' + esc(pl[i].title) + '</span>';
       if (hasRange) {
-        h += '<span class="rng">' + fT(pl[i].start || 0) + '&#8594;' + (pl[i].end !== null ? fT(pl[i].end) : 'end') + '</span>';
+        h += '<span class="rng">' + fT(pl[i].start || 0) + '&#8594;' + (pl[i].end !== null ? fT(pl[i].end) : 'end');
+        h += '<span class="rng-x" onclick="event.stopPropagation();clearTrim(' + i + ')">&#215;</span></span>';
       }
+      h += '<button class="cp" onclick="event.stopPropagation();copyLink(' + i + ')" title="Copy link">&#128279;</button>';
       h += '<button class="rm" onclick="event.stopPropagation();rmPL(' + i + ')">&#215;</button>';
       h += '</div>';
     }
     c.innerHTML = h;
+    syncQueueHeight();
   }
 
   function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 
+  var ssTimer = null;
+  function ssTemp(m) {
+    ss(m);
+    if (ssTimer) clearTimeout(ssTimer);
+    ssTimer = setTimeout(function() {
+      if (ci >= 0 && pl[ci] && P && P.getPlayerState && P.getPlayerState() === YT.PlayerState.PLAYING) {
+        ss("Playing: " + pl[ci].title);
+      }
+      ssTimer = null;
+    }, 1800);
+  }
+
   function doToggle() {
     loop = !loop;
     document.getElementById("loopBtn").innerHTML = "&#8635; Loop: " + (loop ? "ON" : "OFF");
-    ss(loop ? "Looping enabled" : "Looping disabled");
+    ssTemp(loop ? "Looping enabled" : "Looping disabled");
     saveState();
   }
 
   function doShuffle() {
     shuffle = !shuffle;
+    shufflePlayed = {};
     document.getElementById("shuffleBtn").innerHTML = "&#9876; Shuffle: " + (shuffle ? "ON" : "OFF");
-    ss(shuffle ? "Shuffle enabled" : "Shuffle disabled");
+    ssTemp(shuffle ? "Shuffle enabled" : "Shuffle disabled");
     saveState();
   }
 
@@ -881,7 +978,7 @@ header { text-align: center; margin-bottom: 36px; }
     if (ci >= 0 && pl[ci]) { pl[ci].start = a; pl[ci].end = b; rpl(); }
     if (a !== null && P) P.seekTo(a, true);
     startRC();
-    ss("Range: " + fT(a || 0) + " &#8594; " + (b !== null ? fT(b) : "end"));
+    ssTemp("Trim: " + fT(a || 0) + " &#8594; " + (b !== null ? fT(b) : "end"));
   }
 
   function doClrRange() {
@@ -913,7 +1010,19 @@ header { text-align: center; margin-bottom: 36px; }
     else { b.className = "lb ct"; b.innerHTML = lc + " loop" + (lc !== 1 ? "s" : ""); }
   }
 
-  function ss(m) { document.getElementById("st").innerHTML = m; }
+  var ssFading = false;
+  function ss(m, skipFade) {
+    var el = document.getElementById("st");
+    if (skipFade || !el.innerHTML || !el.offsetParent) { el.innerHTML = m; return; }
+    if (ssFading) { el.classList.remove("fade-out"); void el.offsetWidth; }
+    ssFading = true;
+    el.classList.add("fade-out");
+    setTimeout(function() {
+      el.innerHTML = m;
+      el.classList.remove("fade-out");
+      ssFading = false;
+    }, 300);
+  }
 
   document.getElementById("playBtn").addEventListener("click", doLoad);
   document.getElementById("queueBtn").addEventListener("click", doQueue);
@@ -940,6 +1049,7 @@ header { text-align: center; margin-bottom: 36px; }
   document.getElementById("urlInput").addEventListener("keydown", function(e) {
     if (e.key === "Enter") doLoad();
   });
+  syncQueueHeight();
 })();
 </script>
 </body>
