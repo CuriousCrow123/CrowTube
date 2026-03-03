@@ -562,7 +562,7 @@ header { text-align: center; margin-bottom: 36px; }
   }
 
   /* ── Rain visual effect ── */
-  var rainCanvas = null, rainRCtx = null, rainDrops = [];
+  var rainCanvas = null, rainRCtx = null, rainDrops = [], rainSpawning = false;
   function initRainViz() {
     rainCanvas = document.getElementById("rainCanvas");
     if (!rainCanvas) return;
@@ -578,25 +578,25 @@ header { text-align: center; margin-bottom: 36px; }
   function setRainViz(on) {
     if (!rainCanvas) initRainViz();
     if (!rainCanvas) return;
-    rainCanvas.style.opacity = on ? "1" : "0";
-    if (on && !rainCanvas._animating) {
-      rainCanvas._animating = true;
-      // Seed initial drops
-      for (var i = 0; i < 120; i++) {
-        rainDrops.push({
-          x: Math.random() * rainCanvas.width,
-          y: Math.random() * rainCanvas.height,
-          len: 12 + Math.random() * 22,
-          speed: 4 + Math.random() * 8,
-          opacity: 0.04 + Math.random() * 0.1
-        });
+    rainSpawning = on;
+    if (on) {
+      rainCanvas.style.opacity = "1";
+      if (!rainCanvas._animating) {
+        rainCanvas._animating = true;
+        // Seed initial drops
+        for (var i = 0; i < 120; i++) {
+          rainDrops.push({
+            x: Math.random() * rainCanvas.width,
+            y: Math.random() * rainCanvas.height,
+            len: 12 + Math.random() * 22,
+            speed: 4 + Math.random() * 8,
+            opacity: 0.04 + Math.random() * 0.1
+          });
+        }
+        animateRain();
       }
-      animateRain();
     }
-    if (!on) {
-      rainCanvas._animating = false;
-      rainDrops = [];
-    }
+    // When off, rainSpawning=false lets existing drops drain; animateRain handles cleanup
   }
   function animateRain() {
     if (!rainCanvas || !rainCanvas._animating) return;
@@ -607,11 +607,18 @@ header { text-align: center; margin-bottom: 36px; }
       d.y += d.speed;
       d.x -= d.speed * 0.15; // slight wind angle
       if (d.y > h || d.x < -10) {
-        d.y = -d.len;
-        d.x = Math.random() * (w + 60);
-        d.len = 12 + Math.random() * 22;
-        d.speed = 4 + Math.random() * 8;
-        d.opacity = 0.04 + Math.random() * 0.1;
+        if (rainSpawning) {
+          // Recycle drop at top
+          d.y = -d.len;
+          d.x = Math.random() * (w + 60);
+          d.len = 12 + Math.random() * 22;
+          d.speed = 4 + Math.random() * 8;
+          d.opacity = 0.04 + Math.random() * 0.1;
+        } else {
+          // Remove drop that fell off screen
+          rainDrops.splice(i, 1);
+          continue;
+        }
       }
       ctx.beginPath();
       ctx.moveTo(d.x, d.y);
@@ -619,6 +626,13 @@ header { text-align: center; margin-bottom: 36px; }
       ctx.strokeStyle = "rgba(200,210,230," + d.opacity + ")";
       ctx.lineWidth = 1;
       ctx.stroke();
+    }
+    // Stop animation once all drops have drained
+    if (!rainSpawning && rainDrops.length === 0) {
+      rainCanvas._animating = false;
+      rainCanvas.style.opacity = "0";
+      ctx.clearRect(0, 0, w, h);
+      return;
     }
     requestAnimationFrame(animateRain);
   }
@@ -651,6 +665,8 @@ header { text-align: center; margin-bottom: 36px; }
           if (e.data === YT.PlayerState.PLAYING) {
             document.getElementById("ph").style.display = "none";
             setVizActive(true);
+            advancing = false;
+            rcStopping = false;
             if (ci >= 0 && pl[ci]) ss("Playing: " + pl[ci].title);
             startRC();
           } else if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.BUFFERING) {
@@ -671,7 +687,7 @@ header { text-align: center; margin-bottom: 36px; }
     /* Shared logic: advance to next video or loop back */
     if (pl.length <= 1) {
       if (loop) { goS(); P.playVideo(); lc++; ub(); }
-      else { P.pauseVideo(); ss("Queue finished"); setVizActive(false); }
+      else { P.seekTo(le || P.getDuration(), true); P.pauseVideo(); advancing = false; ss("Queue finished"); setVizActive(false); }
     } else if (shuffle) {
       var pick = ci;
       while (pick === ci && pl.length > 1) pick = Math.floor(Math.random() * pl.length);
@@ -684,18 +700,35 @@ header { text-align: center; margin-bottom: 36px; }
         lc++; ub();
         window.playIdx(0);
       } else {
-        P.pauseVideo(); ss("Queue finished"); setVizActive(false);
+        P.seekTo(le || P.getDuration(), true); P.pauseVideo(); advancing = false; ss("Queue finished"); setVizActive(false);
       }
     }
-    setTimeout(function() { advancing = false; }, 500);
+    // advancing is reset when next video enters PLAYING state
   }
 
+  var rcStopping = false;
   function startRC() {
     stopRC();
+    rcStopping = false;
     if (le !== null) {
       rci = setInterval(function() {
+        if (rcStopping) return;
         if (P && P.getCurrentTime && le !== null && P.getCurrentTime() >= le) {
-          advanceQueue();
+          // Check if we should stop here (last video, loop off, no next)
+          var shouldStop = false;
+          if (!loop) {
+            if (pl.length <= 1) shouldStop = true;
+            else if (!shuffle && ci + 1 >= pl.length) shouldStop = true;
+          }
+          if (shouldStop) {
+            rcStopping = true;
+            stopRC();
+            P.pauseVideo();
+            ss("Queue finished");
+            setVizActive(false);
+          } else {
+            advanceQueue();
+          }
         }
       }, 250);
     }
@@ -757,10 +790,11 @@ header { text-align: center; margin-bottom: 36px; }
     ft(id, idx);
   }
 
-  window.playIdx = function(i) {
+  window.playIdx = function(i, manual) {
     if (i < 0 || i >= pl.length) return;
     if (!P || !P.loadVideoById) { ss("Player not ready"); return; }
-    ci = i; lc = 0; ub();
+    ci = i;
+    if (manual) { lc = 0; ub(); }
     restoreRange();
     P.loadVideoById({ videoId: pl[i].id, startSeconds: ls || 0 });
     rpl(); ss("Playing: " + pl[i].title);
@@ -771,9 +805,9 @@ header { text-align: center; margin-bottom: 36px; }
     if (shuffle && pl.length > 1) {
       var pick = ci;
       while (pick === ci) pick = Math.floor(Math.random() * pl.length);
-      window.playIdx(pick);
+      window.playIdx(pick, true);
     } else {
-      window.playIdx((ci + 1) % pl.length);
+      window.playIdx((ci + 1) % pl.length, true);
     }
   }
 
@@ -792,7 +826,7 @@ header { text-align: center; margin-bottom: 36px; }
     var h = "";
     for (var i = 0; i < pl.length; i++) {
       var hasRange = pl[i].start !== null || pl[i].end !== null;
-      h += '<div class="pi' + (i === ci ? ' ac' : '') + '" onclick="playIdx(' + i + ')">';
+      h += '<div class="pi' + (i === ci ? ' ac' : '') + '" onclick="playIdx(' + i + ',true)">';
       h += '<span class="ix">' + String(i + 1).padStart(2, "0") + '</span>';
       h += '<span class="tt">' + esc(pl[i].title) + '</span>';
       if (hasRange) {
