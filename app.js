@@ -50,6 +50,7 @@
   var player = null;              // YouTube player instance
   var playlist = [];              // Array of { id, title, start, end }
   var currentIndex = -1;          // Index of currently playing video
+  var loadedFromShare = false;    // True when queue was imported from a share link
   var loopEnabled = true;         // Queue looping on/off
   var shuffleEnabled = false;     // Shuffle mode on/off
   var loopCount = 0;              // Number of full queue loops completed
@@ -211,6 +212,7 @@
     if (!data) return false;
     playlist = data.videos;
     currentIndex = 0;
+    loadedFromShare = true;
     if (data.rain && !rainOn) {
       rainOn = true;
       document.getElementById("rain-btn").innerHTML = "&#127783; Rain: ON";
@@ -221,6 +223,7 @@
       document.getElementById("rain-vol").value = Math.round(rainVolume * 100);
       if (rainAudio) rainAudio.volume = rainVolume;
     }
+    if (rainOn) startRain();
     history.replaceState(null, "", window.location.pathname);
     renderPlaylist();
     if (player && player.loadVideoById) {
@@ -296,12 +299,13 @@
 
   function startRain() {
     initRainAudio();
-    rainAudio.volume = rainVolume;
+    rainAudio.volume = 0;
     var p = rainAudio.play();
     if (p && p.catch) p.catch(function (err) {
       console.error("Rain play failed:", err);
       setStatus("Rain: tap to enable audio");
     });
+    fadeRainVolume(rainVolume, 5000);
     setRainVisual(true);
   }
 
@@ -820,8 +824,14 @@
           renderPlaylist();
           if (playlist.length && currentIndex >= 0 && currentIndex < playlist.length) {
             restoreRange();
-            player.cueVideoById({ videoId: playlist[currentIndex].id, startSeconds: rangeStart || 0 });
-            setStatus("Restored: " + playlist[currentIndex].title);
+            if (loadedFromShare) {
+              player.loadVideoById({ videoId: playlist[currentIndex].id, startSeconds: rangeStart || 0 });
+              setStatus("Playing: " + playlist[currentIndex].title);
+              loadedFromShare = false;
+            } else {
+              player.cueVideoById({ videoId: playlist[currentIndex].id, startSeconds: rangeStart || 0 });
+              setStatus("Restored: " + playlist[currentIndex].title);
+            }
             for (var i = 0; i < playlist.length; i++) fetchTitle(playlist[i].id, i);
           } else {
             setStatus("Player ready");
@@ -899,16 +909,8 @@
     if (e.key === "Enter") handlePlay();
   });
 
-  // Auto-resume rain on first user interaction if it was saved as ON
-  if (rainOn) {
-    var resumeRain = function () {
-      startRain();
-      document.removeEventListener("click", resumeRain);
-      document.removeEventListener("keydown", resumeRain);
-    };
-    document.addEventListener("click", resumeRain, { once: false });
-    document.addEventListener("keydown", resumeRain, { once: false });
-  }
+  // Auto-start rain if it was saved as ON (share link already started it)
+  if (rainOn) startRain();
 
   syncQueueHeight();
   initDragListeners();
