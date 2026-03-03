@@ -153,12 +153,27 @@
       }
       parts.push(part);
     }
-    return parts.join("|");
+    var hash = parts.join("|");
+    if (rainOn) hash += "&rain=1&rvol=" + Math.round(rainVolume * 100);
+    return hash;
   }
 
   function decodeShareHash(hash) {
     if (!hash) return null;
-    var items = hash.split("|");
+    // Parse flags after "&"
+    var flags = {};
+    var ampIdx = hash.indexOf("&");
+    var videoPart = hash;
+    if (ampIdx !== -1) {
+      var flagStr = hash.slice(ampIdx + 1);
+      videoPart = hash.slice(0, ampIdx);
+      var pairs = flagStr.split("&");
+      for (var f = 0; f < pairs.length; f++) {
+        var kv = pairs[f].split("=");
+        if (kv.length === 2) flags[kv[0]] = kv[1];
+      }
+    }
+    var items = videoPart.split("|");
     var result = [];
     for (var i = 0; i < items.length; i++) {
       var seg = items[i].split(",");
@@ -170,7 +185,10 @@
       if (end !== null && isNaN(end)) end = null;
       result.push({ id: id, title: "Video " + id, start: start, end: end });
     }
-    return result.length ? result : null;
+    if (!result.length) return null;
+    var rvol = flags.rvol !== undefined ? Number(flags.rvol) / 100 : null;
+    if (rvol !== null && (isNaN(rvol) || rvol < 0 || rvol > 1)) rvol = null;
+    return { videos: result, rain: flags.rain === "1", rainVol: rvol };
   }
 
   function handleShare() {
@@ -191,8 +209,18 @@
     try { raw = decodeURIComponent(raw); } catch (e) {}
     var data = decodeShareHash(raw);
     if (!data) return false;
-    playlist = data;
+    playlist = data.videos;
     currentIndex = 0;
+    if (data.rain && !rainOn) {
+      rainOn = true;
+      document.getElementById("rain-btn").innerHTML = "&#127783; Rain: ON";
+      document.getElementById("rain-vol").classList.add("show");
+    }
+    if (data.rainVol !== null) {
+      rainVolume = data.rainVol;
+      document.getElementById("rain-vol").value = Math.round(rainVolume * 100);
+      if (rainAudio) rainAudio.volume = rainVolume;
+    }
     history.replaceState(null, "", window.location.pathname);
     renderPlaylist();
     if (player && player.loadVideoById) {
