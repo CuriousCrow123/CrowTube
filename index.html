@@ -46,35 +46,36 @@ header { text-align: center; margin-bottom: 36px; }
 }
 /* ── Tagline + Visualizer combo ── */
 .tagline-wrap {
-  position: relative; display: flex; align-items: center; justify-content: center;
-  height: 36px; margin-bottom: 0; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center;
+  position: relative; height: 22px; overflow: hidden;
+  margin: 0 auto; padding: 0 4px;
 }
 .tagline {
   position: relative; z-index: 2;
   font-family: 'DM Mono', monospace; font-size: 13px; letter-spacing: 3px;
-  color: var(--dim); text-transform: lowercase;
+  color: var(--dim); text-transform: lowercase; white-space: nowrap;
 }
 .tagline span { color: var(--accent); }
 
-/* ── Audio Visualizer (behind tagline) ── */
+/* ── Audio Visualizer (behind tagline, sized to text) ── */
 .viz {
   position: absolute; z-index: 1; inset: 0;
   display: flex; align-items: flex-end; justify-content: center;
-  gap: 3px; opacity: 0.12; transition: opacity 0.6s;
+  gap: 2px; opacity: 0.15; transition: opacity 0.6s;
 }
-.viz.active { opacity: 0.22; }
+.viz.active { opacity: 0.25; }
 .viz-bar {
-  width: 3px; border-radius: 2px;
+  flex: 1; min-width: 0; border-radius: 1.5px;
   background: linear-gradient(to top, var(--accent), rgba(255,77,106,0.15));
   animation: viz-idle 1.8s ease-in-out infinite;
 }
 .viz.active .viz-bar { animation-name: viz-play; }
 @keyframes viz-idle {
-  0%, 100% { height: 4px; opacity: 0.4; }
+  0%, 100% { height: 3px; opacity: 0.4; }
   50% { height: 10px; opacity: 0.7; }
 }
 @keyframes viz-play {
-  0%, 100% { height: 4px; }
+  0%, 100% { height: 3px; }
   25% { height: var(--h1); }
   50% { height: var(--h2); }
   75% { height: var(--h3); }
@@ -283,21 +284,20 @@ header { text-align: center; margin-bottom: 36px; }
   /* ── Build visualizer bars ── */
   var vizEl = document.getElementById("viz");
   if (vizEl) {
-    // 24 bars with pseudo-random heights for organic feel
-    var barCount = 24;
+    // Bars sized to fit the tagline text width (~220px) and 22px height
+    var barCount = 40;
     for (var b = 0; b < barCount; b++) {
       var bar = document.createElement("div");
       bar.className = "viz-bar";
-      // Use sine-based offsets so neighboring bars look natural
       var phase = (b / barCount) * Math.PI * 2;
-      var h1 = Math.round(6 + 18 * Math.abs(Math.sin(phase * 2.3)));
-      var h2 = Math.round(4 + 20 * Math.abs(Math.sin(phase * 1.7 + 1)));
-      var h3 = Math.round(5 + 16 * Math.abs(Math.sin(phase * 3.1 + 2)));
+      var h1 = Math.round(4 + 16 * Math.abs(Math.sin(phase * 2.3)));
+      var h2 = Math.round(3 + 18 * Math.abs(Math.sin(phase * 1.7 + 1)));
+      var h3 = Math.round(4 + 14 * Math.abs(Math.sin(phase * 3.1 + 2)));
       bar.style.setProperty("--h1", h1 + "px");
       bar.style.setProperty("--h2", h2 + "px");
       bar.style.setProperty("--h3", h3 + "px");
-      bar.style.animationDelay = (b * 0.08) + "s";
-      bar.style.animationDuration = (1.2 + (b % 5) * 0.15) + "s";
+      bar.style.animationDelay = (b * 0.05) + "s";
+      bar.style.animationDuration = (1.2 + (b % 7) * 0.12) + "s";
       vizEl.appendChild(bar);
     }
   }
@@ -386,14 +386,19 @@ header { text-align: center; margin-bottom: 36px; }
     for (var i = 0; i < pl.length; i++) { if (pl[i].id === id) { ex = i; break; } }
     if (ex === -1) { pl.push({ id: id, title: "Video " + id }); ci = pl.length - 1; }
     else { ci = ex; }
-    rpl(); ss("Playing " + id); ft(id, ci);
+    rpl(); ss("Loading..."); ft(id, ci);
   }
 
   function ft(v, idx) {
     fetch("https://noembed.com/embed?url=https://www.youtube.com/watch?v=" + v)
       .then(function(r) { return r.json(); })
-      .then(function(d) { if (d.title && pl[idx]) { pl[idx].title = d.title; rpl(); } })
-      .catch(function() {});
+      .then(function(d) {
+        if (d.title && pl[idx]) {
+          pl[idx].title = d.title; rpl();
+          if (idx === ci) ss("Playing: " + d.title);
+        }
+      })
+      .catch(function() { if (idx === ci) ss("Playing: " + v); });
   }
 
   function doQueue() {
