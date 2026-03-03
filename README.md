@@ -6,7 +6,7 @@ A minimal YouTube video repeater with queue management, custom play ranges, and 
 
 ## Features
 
-- **Queue** — Add multiple videos, play them in sequence or shuffle through randomly
+- **Queue** — Add multiple videos, play them in sequence or shuffle through randomly; drag and drop to reorder
 - **Loop** — Loop the entire queue endlessly, with a counter tracking completed cycles
 - **Play Range** — Set start/end trim points on any video to loop specific sections
 - **Shuffle** — Plays every video once in random order before starting a new round
@@ -46,7 +46,7 @@ No frameworks, no build tools, no package.json. Vanilla HTML/CSS/JS.
 
 ## How It Works
 
-Paste a YouTube URL or video ID into the input field. **Play** loads it immediately; **+Queue** adds it to the end of the playlist. Click any video in the queue to jump to it.
+Paste a YouTube URL or video ID into the input field. **Play** loads it immediately; **+Queue** adds it to the end of the playlist. Click any video in the queue to jump to it. Drag items to rearrange the play order.
 
 **Play Range** lets you trim a video to a specific segment (e.g., `0:30` to `1:45`). The trim is saved per-video and encoded in share links.
 

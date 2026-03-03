@@ -582,6 +582,90 @@
   }
   window.addEventListener("resize", syncQueueHeight);
 
+  /* ── Drag & Drop Reorder ── */
+
+  var dragFromIndex = null;
+
+  function initDragListeners() {
+    var container = document.getElementById("queue-content");
+
+    container.addEventListener("dragstart", function (e) {
+      var item = e.target.closest(".queue-item");
+      if (!item) return;
+      dragFromIndex = parseInt(item.dataset.index, 10);
+      item.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+
+    function clearDragIndicators() {
+      var items = container.querySelectorAll(".queue-item");
+      for (var i = 0; i < items.length; i++) {
+        items[i].classList.remove("drag-over-top", "drag-over-bottom");
+      }
+    }
+
+    container.addEventListener("dragend", function (e) {
+      var item = e.target.closest(".queue-item");
+      if (item) item.classList.remove("dragging");
+      dragFromIndex = null;
+      clearDragIndicators();
+    });
+
+    container.addEventListener("dragover", function (e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      var item = e.target.closest(".queue-item");
+      if (!item) return;
+      clearDragIndicators();
+      var idx = parseInt(item.dataset.index, 10);
+      if (idx === dragFromIndex) return;
+      // Detect top vs bottom half
+      var rect = item.getBoundingClientRect();
+      var midY = rect.top + rect.height / 2;
+      if (e.clientY < midY) {
+        item.classList.add("drag-over-top");
+      } else {
+        item.classList.add("drag-over-bottom");
+      }
+    });
+
+    container.addEventListener("dragleave", function (e) {
+      var item = e.target.closest(".queue-item");
+      if (item) item.classList.remove("drag-over-top", "drag-over-bottom");
+    });
+
+    container.addEventListener("drop", function (e) {
+      e.preventDefault();
+      var item = e.target.closest(".queue-item");
+      if (!item || dragFromIndex === null) return;
+      var idx = parseInt(item.dataset.index, 10);
+      if (idx === dragFromIndex) return;
+
+      // Determine actual insert position based on which half was targeted
+      var rect = item.getBoundingClientRect();
+      var midY = rect.top + rect.height / 2;
+      var dropIndex = e.clientY < midY ? idx : idx + 1;
+
+      // Adjust dropIndex if dragging from before the drop point
+      var fromIdx = dragFromIndex;
+      var moved = playlist.splice(fromIdx, 1)[0];
+      if (fromIdx < dropIndex) dropIndex--;
+      playlist.splice(dropIndex, 0, moved);
+
+      // Update currentIndex to follow the playing video
+      if (currentIndex === fromIdx) {
+        currentIndex = dropIndex;
+      } else if (fromIdx < currentIndex && dropIndex >= currentIndex) {
+        currentIndex--;
+      } else if (fromIdx > currentIndex && dropIndex <= currentIndex) {
+        currentIndex++;
+      }
+
+      dragFromIndex = null;
+      renderPlaylist();
+    });
+  }
+
   function renderPlaylist() {
     saveState();
     var container = document.getElementById("queue-content");
@@ -593,7 +677,7 @@
     var html = "";
     for (var i = 0; i < playlist.length; i++) {
       var hasRange = playlist[i].start !== null || playlist[i].end !== null;
-      html += '<div class="queue-item' + (i === currentIndex ? ' active' : '') + '" onclick="playVideoAtIndex(' + i + ',true)">';
+      html += '<div class="queue-item' + (i === currentIndex ? ' active' : '') + '" draggable="true" data-index="' + i + '" onclick="playVideoAtIndex(' + i + ',true)">';
       html += '<span class="item-index">' + String(i + 1).padStart(2, "0") + '</span>';
       html += '<span class="item-title">' + escapeHtml(playlist[i].title) + '</span>';
       if (hasRange) {
@@ -799,5 +883,6 @@
   }
 
   syncQueueHeight();
+  initDragListeners();
 
 })();
