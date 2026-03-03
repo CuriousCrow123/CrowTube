@@ -461,14 +461,35 @@ header { text-align: center; margin-bottom: 36px; }
   }
 
   /* ── Init: load from hash (share link) or localStorage ── */
-  var hashData = decodeShare(window.location.hash.slice(1));
-  if (hashData) {
-    pl = hashData; ci = 0;
-    // Clear hash so refresh uses localStorage
+  function loadFromHash() {
+    var raw = window.location.hash.slice(1);
+    if (!raw) return false;
+    try { raw = decodeURIComponent(raw); } catch(e) {}
+    var data = decodeShare(raw);
+    if (!data) return false;
+    pl = data; ci = 0;
     history.replaceState(null, "", window.location.pathname);
-  } else {
+    rpl();
+    // Auto-play first video if player is ready
+    if (P && P.loadVideoById) {
+      restoreRange();
+      P.loadVideoById(pl[0].id);
+      ss("Playing: " + pl[0].title);
+    }
+    // Fetch fresh titles
+    for (var i = 0; i < pl.length; i++) ft(pl[i].id, i);
+    return true;
+  }
+
+  if (!loadFromHash()) {
     loadState();
   }
+
+  // Re-import if user navigates to a share link while already on the page
+  window.addEventListener("hashchange", function() {
+    loadFromHash();
+  });
+
   // Sync UI to restored state
   if (!loop) document.getElementById("loopBtn").innerHTML = "&#8635; Loop: OFF";
   if (shuffle) document.getElementById("shuffleBtn").innerHTML = "&#9876; Shuffle: ON";
@@ -616,7 +637,7 @@ header { text-align: center; margin-bottom: 36px; }
           rpl();
           if (pl.length && ci >= 0 && ci < pl.length) {
             restoreRange();
-            P.cueVideoById(pl[ci].id);
+            P.cueVideoById({ videoId: pl[ci].id, startSeconds: ls || 0 });
             ss("Restored: " + pl[ci].title);
             // Fetch fresh titles for all items
             for (var i = 0; i < pl.length; i++) ft(pl[i].id, i);
@@ -625,26 +646,7 @@ header { text-align: center; margin-bottom: 36px; }
         onStateChange: function(e) {
           if (e.data === YT.PlayerState.ENDED) {
             setVizActive(false);
-            if (pl.length <= 1) {
-              /* Single video or empty queue — replay it */
-              if (loop) { goS(); P.playVideo(); lc++; ub(); }
-            } else {
-              /* Multiple videos — advance through queue */
-              if (shuffle) {
-                var pick = ci;
-                while (pick === ci && pl.length > 1) pick = Math.floor(Math.random() * pl.length);
-                window.playIdx(pick);
-              } else {
-                var nxt = ci + 1;
-                if (nxt < pl.length) {
-                  window.playIdx(nxt);
-                } else if (loop) {
-                  lc++; ub();
-                  window.playIdx(0);
-                }
-                /* If !loop and nxt >= pl.length, just stop */
-              }
-            }
+            advanceQueue();
           }
           if (e.data === YT.PlayerState.PLAYING) {
             document.getElementById("ph").style.display = "none";
@@ -659,12 +661,37 @@ header { text-align: center; margin-bottom: 36px; }
     });
   };
 
+  var advancing = false;
+  function advanceQueue() {
+    /* Guard against re-entrance from range checker firing multiple times */
+    if (advancing) return;
+    advancing = true;
+    stopRC();
+    /* Shared logic: advance to next video or loop back */
+    if (pl.length <= 1) {
+      if (loop) { goS(); P.playVideo(); lc++; ub(); }
+    } else if (shuffle) {
+      var pick = ci;
+      while (pick === ci && pl.length > 1) pick = Math.floor(Math.random() * pl.length);
+      window.playIdx(pick);
+    } else {
+      var nxt = ci + 1;
+      if (nxt < pl.length) {
+        window.playIdx(nxt);
+      } else if (loop) {
+        lc++; ub();
+        window.playIdx(0);
+      }
+    }
+    setTimeout(function() { advancing = false; }, 500);
+  }
+
   function startRC() {
     stopRC();
     if (le !== null) {
       rci = setInterval(function() {
         if (P && P.getCurrentTime && le !== null && P.getCurrentTime() >= le) {
-          lc++; ub(); goS();
+          advanceQueue();
         }
       }, 250);
     }
@@ -693,12 +720,12 @@ header { text-align: center; margin-bottom: 36px; }
     var id = vid(input);
     if (!id) { ss("Invalid YouTube URL"); return; }
     lc = 0; ub();
-    if (P && P.loadVideoById) P.loadVideoById(id);
     var ex = -1;
     for (var i = 0; i < pl.length; i++) { if (pl[i].id === id) { ex = i; break; } }
     if (ex === -1) { pl.push({ id: id, title: "Video " + id, start: null, end: null }); ci = pl.length - 1; }
     else { ci = ex; }
     restoreRange();
+    if (P && P.loadVideoById) P.loadVideoById({ videoId: id, startSeconds: ls || 0 });
     rpl(); ss("Loading..."); ft(id, ci);
   }
 
@@ -731,7 +758,7 @@ header { text-align: center; margin-bottom: 36px; }
     if (!P || !P.loadVideoById) { ss("Player not ready"); return; }
     ci = i; lc = 0; ub();
     restoreRange();
-    P.loadVideoById(pl[i].id);
+    P.loadVideoById({ videoId: pl[i].id, startSeconds: ls || 0 });
     rpl(); ss("Playing: " + pl[i].title);
   };
 
