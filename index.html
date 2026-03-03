@@ -61,25 +61,17 @@ header { text-align: center; margin-bottom: 36px; }
 .viz {
   position: absolute; z-index: 1; inset: 0;
   display: flex; align-items: flex-end; justify-content: center;
-  gap: 2px; opacity: 0.15; transition: opacity 0.6s;
+  gap: 2px; opacity: 0.15; transition: opacity 0.8s ease;
 }
 .viz.active { opacity: 0.25; }
 .viz-bar {
   flex: 1; min-width: 0; border-radius: 1.5px;
   background: linear-gradient(to top, var(--accent), rgba(255,77,106,0.15));
-  animation: viz-idle 1.8s ease-in-out infinite;
+  height: 3px;
+  transition: height 0.18s ease-out, opacity 0.4s ease;
+  opacity: 0.5;
 }
-.viz.active .viz-bar { animation-name: viz-play; }
-@keyframes viz-idle {
-  0%, 100% { height: 3px; opacity: 0.4; }
-  50% { height: 10px; opacity: 0.7; }
-}
-@keyframes viz-play {
-  0%, 100% { height: 3px; }
-  25% { height: var(--h1); }
-  50% { height: var(--h2); }
-  75% { height: var(--h3); }
-}
+.viz.active .viz-bar { opacity: 1; }
 
 /* ── Inputs & Buttons ── */
 .ig { display: flex; gap: 10px; margin-bottom: 28px; }
@@ -257,6 +249,8 @@ header { text-align: center; margin-bottom: 36px; }
       <button class="b bs bsm" id="loopBtn">&#8635; Loop: ON</button>
       <div class="lb" id="lc"><span class="inf">&#8734;</span> loops</div>
       <div class="sep"></div>
+      <button class="b bs bsm" id="shuffleBtn">&#9876; Shuffle: OFF</button>
+      <div class="sep"></div>
       <button class="b bs bsm" id="restartBtn">&#8634; Restart</button>
       <button class="b bs bsm" id="nextBtn">Next &#9658;</button>
     </div>
@@ -289,23 +283,35 @@ header { text-align: center; margin-bottom: 36px; }
 (function() {
   /* ── Build visualizer bars ── */
   var vizEl = document.getElementById("viz");
+  var vizBars = [], vizAnim = null, vizActive = false, vizEnergy = 0;
   if (vizEl) {
-    // Bars sized to fit the tagline text width (~220px) and 22px height
     var barCount = 40;
     for (var b = 0; b < barCount; b++) {
       var bar = document.createElement("div");
       bar.className = "viz-bar";
-      var phase = (b / barCount) * Math.PI * 2;
-      var h1 = Math.round(4 + 16 * Math.abs(Math.sin(phase * 2.3)));
-      var h2 = Math.round(3 + 18 * Math.abs(Math.sin(phase * 1.7 + 1)));
-      var h3 = Math.round(4 + 14 * Math.abs(Math.sin(phase * 3.1 + 2)));
-      bar.style.setProperty("--h1", h1 + "px");
-      bar.style.setProperty("--h2", h2 + "px");
-      bar.style.setProperty("--h3", h3 + "px");
-      bar.style.animationDelay = (b * 0.05) + "s";
-      bar.style.animationDuration = (1.2 + (b % 7) * 0.12) + "s";
+      bar.style.height = "3px";
       vizEl.appendChild(bar);
+      vizBars.push({ el: bar, phase: (b / barCount) * Math.PI * 2, vel: 0.8 + Math.random() * 1.4 });
     }
+    var vizT = 0;
+    function vizTick() {
+      /* energy ramps smoothly toward target (1 when active, 0 when idle) */
+      var target = vizActive ? 1 : 0;
+      vizEnergy += (target - vizEnergy) * (vizActive ? 0.08 : 0.04);
+      if (vizEnergy < 0.005) vizEnergy = 0;
+      vizT += 0.06;
+      for (var i = 0; i < vizBars.length; i++) {
+        var vb = vizBars[i];
+        /* idle: gentle sine wave at 3-8px. active: energetic 3-20px */
+        var idleH = 3 + 4 * Math.abs(Math.sin(vizT * 0.4 + vb.phase));
+        var playH = 3 + 17 * Math.abs(Math.sin(vizT * vb.vel + vb.phase * 2.3))
+                      * (0.5 + 0.5 * Math.sin(vizT * 0.7 + vb.phase * 1.1));
+        var h = idleH + (playH - idleH) * vizEnergy;
+        vb.el.style.height = h.toFixed(1) + "px";
+      }
+      vizAnim = requestAnimationFrame(vizTick);
+    }
+    vizAnim = requestAnimationFrame(vizTick);
   }
 
   /* ── Detect file:// and show instructions ── */
@@ -316,9 +322,10 @@ header { text-align: center; margin-bottom: 36px; }
   }
 
   /* ── State ── */
-  var P = null, loop = true, lc = 0, pl = [], ci = -1, ls = null, le = null, rci = null;
+  var P = null, loop = true, shuffle = false, lc = 0, pl = [], ci = -1, ls = null, le = null, rci = null;
 
   function setVizActive(on) {
+    vizActive = on;
     var v = document.getElementById("viz");
     if (v) { if (on) v.classList.add("active"); else v.classList.remove("active"); }
   }
@@ -337,8 +344,26 @@ header { text-align: center; margin-bottom: 36px; }
         onStateChange: function(e) {
           if (e.data === YT.PlayerState.ENDED) {
             setVizActive(false);
-            if (loop) { goS(); P.playVideo(); lc++; ub(); }
-            else { doNext(); }
+            if (pl.length <= 1) {
+              /* Single video or empty queue — replay it */
+              if (loop) { goS(); P.playVideo(); lc++; ub(); }
+            } else {
+              /* Multiple videos — advance through queue */
+              if (shuffle) {
+                var pick = ci;
+                while (pick === ci && pl.length > 1) pick = Math.floor(Math.random() * pl.length);
+                window.playIdx(pick);
+              } else {
+                var nxt = ci + 1;
+                if (nxt < pl.length) {
+                  window.playIdx(nxt);
+                } else if (loop) {
+                  lc++; ub();
+                  window.playIdx(0);
+                }
+                /* If !loop and nxt >= pl.length, just stop */
+              }
+            }
           }
           if (e.data === YT.PlayerState.PLAYING) {
             document.getElementById("ph").style.display = "none";
@@ -431,7 +456,13 @@ header { text-align: center; margin-bottom: 36px; }
 
   function doNext() {
     if (!pl.length) return;
-    window.playIdx((ci + 1) % pl.length);
+    if (shuffle && pl.length > 1) {
+      var pick = ci;
+      while (pick === ci) pick = Math.floor(Math.random() * pl.length);
+      window.playIdx(pick);
+    } else {
+      window.playIdx((ci + 1) % pl.length);
+    }
   }
 
   window.rmPL = function(i) {
@@ -466,6 +497,12 @@ header { text-align: center; margin-bottom: 36px; }
     loop = !loop;
     document.getElementById("loopBtn").innerHTML = "&#8635; Loop: " + (loop ? "ON" : "OFF");
     ss(loop ? "Looping enabled" : "Looping disabled");
+  }
+
+  function doShuffle() {
+    shuffle = !shuffle;
+    document.getElementById("shuffleBtn").innerHTML = "&#9876; Shuffle: " + (shuffle ? "ON" : "OFF");
+    ss(shuffle ? "Shuffle enabled" : "Shuffle disabled");
   }
 
   function doRestart() { if (P && P.seekTo) { goS(); P.playVideo(); } }
@@ -532,6 +569,7 @@ header { text-align: center; margin-bottom: 36px; }
   document.getElementById("playBtn").addEventListener("click", doLoad);
   document.getElementById("queueBtn").addEventListener("click", doQueue);
   document.getElementById("loopBtn").addEventListener("click", doToggle);
+  document.getElementById("shuffleBtn").addEventListener("click", doShuffle);
   document.getElementById("restartBtn").addEventListener("click", doRestart);
   document.getElementById("nextBtn").addEventListener("click", doNext);
   document.getElementById("setRangeBtn").addEventListener("click", doSetRange);
