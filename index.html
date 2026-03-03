@@ -151,6 +151,11 @@ header { text-align: center; margin-bottom: 36px; }
 .pi .ix { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--dim); min-width: 20px; }
 .pi.ac .ix { color: var(--accent); }
 .pi .tt { flex: 1; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pi .rng {
+  font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent);
+  background: rgba(255,77,106,.08); border: 1px solid rgba(255,77,106,.15);
+  border-radius: 6px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0;
+}
 .pi .rm {
   opacity: 0; color: var(--dim); font-size: 18px; background: none; border: none;
   cursor: pointer; transition: opacity .15s; padding: 0 4px;
@@ -380,12 +385,13 @@ header { text-align: center; margin-bottom: 36px; }
     var input = document.getElementById("urlInput").value;
     var id = vid(input);
     if (!id) { ss("Invalid YouTube URL"); return; }
-    lc = 0; ub(); doClrRange();
+    lc = 0; ub();
     if (P && P.loadVideoById) P.loadVideoById(id);
     var ex = -1;
     for (var i = 0; i < pl.length; i++) { if (pl[i].id === id) { ex = i; break; } }
-    if (ex === -1) { pl.push({ id: id, title: "Video " + id }); ci = pl.length - 1; }
+    if (ex === -1) { pl.push({ id: id, title: "Video " + id, start: null, end: null }); ci = pl.length - 1; }
     else { ci = ex; }
+    restoreRange();
     rpl(); ss("Loading..."); ft(id, ci);
   }
 
@@ -407,7 +413,7 @@ header { text-align: center; margin-bottom: 36px; }
     if (!id) { ss("Invalid YouTube URL"); return; }
     for (var i = 0; i < pl.length; i++) { if (pl[i].id === id) { ss("Already in queue"); return; } }
     var idx = pl.length;
-    pl.push({ id: id, title: "Video " + id });
+    pl.push({ id: id, title: "Video " + id, start: null, end: null });
     rpl(); ss("Added to queue");
     document.getElementById("urlInput").value = "";
     ft(id, idx);
@@ -415,7 +421,8 @@ header { text-align: center; margin-bottom: 36px; }
 
   window.playIdx = function(i) {
     if (i < 0 || i >= pl.length) return;
-    ci = i; lc = 0; ub(); doClrRange();
+    ci = i; lc = 0; ub();
+    restoreRange();
     P.loadVideoById(pl[i].id);
     rpl(); ss("Playing: " + pl[i].title);
   };
@@ -438,9 +445,13 @@ header { text-align: center; margin-bottom: 36px; }
     if (!pl.length) { c.innerHTML = '<div class="ep">No videos in queue &#8212; add some!</div>'; return; }
     var h = "";
     for (var i = 0; i < pl.length; i++) {
+      var hasRange = pl[i].start !== null || pl[i].end !== null;
       h += '<div class="pi' + (i === ci ? ' ac' : '') + '" onclick="playIdx(' + i + ')">';
       h += '<span class="ix">' + String(i + 1).padStart(2, "0") + '</span>';
       h += '<span class="tt">' + esc(pl[i].title) + '</span>';
+      if (hasRange) {
+        h += '<span class="rng">' + fT(pl[i].start || 0) + '&#8594;' + (pl[i].end !== null ? fT(pl[i].end) : 'end') + '</span>';
+      }
       h += '<button class="rm" onclick="event.stopPropagation();rmPL(' + i + ')">&#215;</button>';
       h += '</div>';
     }
@@ -478,6 +489,8 @@ header { text-align: center; margin-bottom: 36px; }
     ls = a; le = b;
     if (a !== null) document.getElementById("sTime").value = fT(a);
     if (b !== null) document.getElementById("eTime").value = fT(b);
+    // Save to current playlist item
+    if (ci >= 0 && pl[ci]) { pl[ci].start = a; pl[ci].end = b; rpl(); }
     if (a !== null && P) P.seekTo(a, true);
     startRC();
     ss("Range: " + fT(a || 0) + " &#8594; " + (b !== null ? fT(b) : "end"));
@@ -487,7 +500,23 @@ header { text-align: center; margin-bottom: 36px; }
     ls = null; le = null;
     document.getElementById("sTime").value = "";
     document.getElementById("eTime").value = "";
+    // Clear from current playlist item
+    if (ci >= 0 && pl[ci]) { pl[ci].start = null; pl[ci].end = null; rpl(); }
     stopRC();
+  }
+
+  function restoreRange() {
+    stopRC();
+    if (ci >= 0 && pl[ci] && (pl[ci].start !== null || pl[ci].end !== null)) {
+      ls = pl[ci].start; le = pl[ci].end;
+      document.getElementById("sTime").value = fT(ls);
+      document.getElementById("eTime").value = fT(le);
+      startRC();
+    } else {
+      ls = null; le = null;
+      document.getElementById("sTime").value = "";
+      document.getElementById("eTime").value = "";
+    }
   }
 
   function ub() {
