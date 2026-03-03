@@ -73,6 +73,32 @@ header { text-align: center; margin-bottom: 36px; }
 }
 .viz.active .viz-bar { opacity: 1; }
 
+/* ── Rain volume slider ── */
+.rain-wrap { display: flex; align-items: center; gap: 8px; }
+.rain-vol {
+  width: 0; opacity: 0; transition: width 0.3s ease, opacity 0.3s ease;
+  appearance: none; -webkit-appearance: none; background: transparent;
+  cursor: pointer; height: 20px; vertical-align: middle;
+}
+.rain-vol.show { width: 80px; opacity: 1; }
+.rain-vol::-webkit-slider-runnable-track {
+  height: 3px; border-radius: 2px;
+  background: var(--border);
+}
+.rain-vol::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--accent); margin-top: -4.5px;
+  box-shadow: 0 0 6px var(--glow);
+}
+.rain-vol::-moz-range-track {
+  height: 3px; border-radius: 2px; background: var(--border); border: none;
+}
+.rain-vol::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%; border: none;
+  background: var(--accent); box-shadow: 0 0 6px var(--glow);
+}
+
 /* ── Inputs & Buttons ── */
 .ig { display: flex; gap: 10px; margin-bottom: 28px; }
 .ui {
@@ -157,6 +183,37 @@ header { text-align: center; margin-bottom: 36px; }
 .pi .rm:hover { color: var(--accent); }
 .ep { padding: 32px; text-align: center; color: var(--dim); font-size: 13px; }
 .st { text-align: center; margin-top: 20px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--dim); }
+.toast {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--surface); border: 1px solid var(--accent); border-radius: 10px;
+  padding: 10px 22px; font-family: 'DM Mono', monospace; font-size: 13px; color: var(--accent);
+  opacity: 0; transition: opacity 0.3s, transform 0.3s; pointer-events: none; z-index: 100;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Rain canvas overlay ── */
+.rain-canvas {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; will-change: opacity;
+  opacity: 0; transition: opacity 1.5s ease;
+}
+
+/* ── Share button (accent outline style) ── */
+.b.share-btn {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid rgba(255,77,106,0.3);
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 8px 14px;
+  transition: all 0.25s ease;
+  letter-spacing: 0.5px;
+}
+.b.share-btn:hover {
+  background: rgba(255,77,106,0.08);
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(255,77,106,0.15);
+  transform: translateY(-1px);
+}
 
 /* ── file:// warning banner ── */
 .file-warning {
@@ -251,6 +308,11 @@ header { text-align: center; margin-bottom: 36px; }
       <div class="sep"></div>
       <button class="b bs bsm" id="shuffleBtn">&#9876; Shuffle: OFF</button>
       <div class="sep"></div>
+      <div class="rain-wrap">
+        <button class="b bs bsm" id="rainBtn">&#127783; Rain</button>
+        <input type="range" class="rain-vol" id="rainVol" min="0" max="100" value="30" />
+      </div>
+      <div class="sep"></div>
       <button class="b bs bsm" id="restartBtn">&#8634; Restart</button>
       <button class="b bs bsm" id="nextBtn">Next &#9658;</button>
     </div>
@@ -269,7 +331,10 @@ header { text-align: center; margin-bottom: 36px; }
   <div class="pls">
     <div class="plh">
       <span class="plt">Queue</span>
-      <button class="b bs bsm" id="clrAllBtn">Clear All</button>
+      <div style="display:flex;gap:8px">
+        <button class="b share-btn" id="shareBtn">&#128279; Share Queue</button>
+        <button class="b bs bsm" id="clrAllBtn">Clear All</button>
+      </div>
     </div>
     <div class="pli" id="plc">
       <div class="ep">No videos in queue &#8212; add some!</div>
@@ -278,6 +343,9 @@ header { text-align: center; margin-bottom: 36px; }
 
   <div class="st" id="st">Ready</div>
 </div>
+<div class="toast" id="toast"></div>
+<canvas id="rainCanvas" class="rain-canvas"></canvas>
+<audio id="rainAudioEl" loop preload="auto" src="liecio-light-rain-109591.mp3" style="display:none"></audio>
 
 <script>
 (function() {
@@ -323,11 +391,215 @@ header { text-align: center; margin-bottom: 36px; }
 
   /* ── State ── */
   var P = null, loop = true, shuffle = false, lc = 0, pl = [], ci = -1, ls = null, le = null, rci = null;
+  var rainAudio = null, rainOn = false, rainVol = 0.3;
+  var KEY = "crowtube";
+
+  /* ── localStorage helpers ── */
+  function saveState() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({ pl: pl, ci: ci, loop: loop, shuffle: shuffle, rainOn: rainOn, rainVol: rainVol }));
+    } catch(e) {}
+  }
+  function loadState() {
+    try {
+      var d = JSON.parse(localStorage.getItem(KEY));
+      if (d && Array.isArray(d.pl)) {
+        pl = d.pl; ci = typeof d.ci === "number" ? d.ci : -1;
+        if (typeof d.loop === "boolean") loop = d.loop;
+        if (typeof d.shuffle === "boolean") shuffle = d.shuffle;
+        if (typeof d.rainOn === "boolean") rainOn = d.rainOn;
+        if (typeof d.rainVol === "number") rainVol = d.rainVol;
+      }
+    } catch(e) {}
+  }
+
+  /* ── Share link: encode playlist + ranges in URL hash ── */
+  function encodeShare() {
+    if (!pl.length) return null;
+    // Format: id,start,end|id,start,end|...
+    var parts = [];
+    for (var i = 0; i < pl.length; i++) {
+      var p = pl[i].id;
+      if (pl[i].start !== null || pl[i].end !== null) {
+        p += "," + (pl[i].start !== null ? pl[i].start : "") + "," + (pl[i].end !== null ? pl[i].end : "");
+      }
+      parts.push(p);
+    }
+    return parts.join("|");
+  }
+  function decodeShare(hash) {
+    if (!hash) return null;
+    var items = hash.split("|");
+    var result = [];
+    for (var i = 0; i < items.length; i++) {
+      var seg = items[i].split(",");
+      var id = seg[0];
+      if (!id || !/^[a-zA-Z0-9_-]{11}$/.test(id)) continue;
+      var s = seg[1] !== undefined && seg[1] !== "" ? Number(seg[1]) : null;
+      var e = seg[2] !== undefined && seg[2] !== "" ? Number(seg[2]) : null;
+      if (s !== null && isNaN(s)) s = null;
+      if (e !== null && isNaN(e)) e = null;
+      result.push({ id: id, title: "Video " + id, start: s, end: e });
+    }
+    return result.length ? result : null;
+  }
+  function doShare() {
+    if (!pl.length) { ss("Nothing to share"); return; }
+    var encoded = encodeShare();
+    var url = window.location.origin + window.location.pathname + "#" + encoded;
+    navigator.clipboard.writeText(url).then(function() {
+      showToast("Link copied to clipboard!");
+    }).catch(function() {
+      showToast("Couldn\u2019t copy \u2014 check console");
+      console.log("Share URL:", url);
+    });
+  }
+  function showToast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    setTimeout(function() { t.classList.remove("show"); }, 2200);
+  }
+
+  /* ── Init: load from hash (share link) or localStorage ── */
+  var hashData = decodeShare(window.location.hash.slice(1));
+  if (hashData) {
+    pl = hashData; ci = 0;
+    // Clear hash so refresh uses localStorage
+    history.replaceState(null, "", window.location.pathname);
+  } else {
+    loadState();
+  }
+  // Sync UI to restored state
+  if (!loop) document.getElementById("loopBtn").innerHTML = "&#8635; Loop: OFF";
+  if (shuffle) document.getElementById("shuffleBtn").innerHTML = "&#9876; Shuffle: ON";
+  if (rainOn) {
+    document.getElementById("rainBtn").innerHTML = "&#127783; Rain: ON";
+    document.getElementById("rainVol").classList.add("show");
+  }
+  document.getElementById("rainVol").value = Math.round(rainVol * 100);
 
   function setVizActive(on) {
     vizActive = on;
     var v = document.getElementById("viz");
     if (v) { if (on) v.classList.add("active"); else v.classList.remove("active"); }
+  }
+
+  /* ── Rain ambient noise — recorded loop ── */
+  var rainFadeIv = null;
+
+  function rainInit() {
+    if (rainAudio) return;
+    rainAudio = document.getElementById("rainAudioEl");
+    rainAudio.volume = 0;
+  }
+
+  function rainFade(target, dur) {
+    if (!rainAudio) return;
+    if (rainFadeIv) clearInterval(rainFadeIv);
+    var start = rainAudio.volume, diff = target - start;
+    if (Math.abs(diff) < 0.01) { rainAudio.volume = target; return; }
+    var steps = Math.ceil(dur / 20), step = 0;
+    rainFadeIv = setInterval(function() {
+      step++;
+      var v = start + diff * (step / steps);
+      rainAudio.volume = Math.max(0, Math.min(1, v));
+      if (step >= steps) { clearInterval(rainFadeIv); rainFadeIv = null; }
+    }, 20);
+  }
+
+  function rainStart() {
+    rainInit();
+    // Set volume immediately so audio is audible even if fade has issues
+    rainAudio.volume = rainVol;
+    var p = rainAudio.play();
+    if (p && p.catch) p.catch(function(err) {
+      console.error("Rain play failed:", err);
+      ss("Rain: tap to enable audio");
+    });
+    setRainViz(true);
+  }
+
+  function rainStop() {
+    if (!rainAudio) return;
+    rainFade(0, 500);
+    setTimeout(function() { if (!rainOn && rainAudio) rainAudio.pause(); }, 600);
+    setRainViz(false);
+  }
+
+  function doRain() {
+    rainOn = !rainOn;
+    document.getElementById("rainBtn").innerHTML = "&#127783; Rain" + (rainOn ? ": ON" : "");
+    document.getElementById("rainVol").classList.toggle("show", rainOn);
+    if (rainOn) rainStart(); else rainStop();
+    saveState();
+  }
+
+  function onRainVol(e) {
+    rainVol = e.target.value / 100;
+    if (rainOn && rainAudio) rainAudio.volume = rainVol;
+    saveState();
+  }
+
+  /* ── Rain visual effect ── */
+  var rainCanvas = null, rainRCtx = null, rainDrops = [];
+  function initRainViz() {
+    rainCanvas = document.getElementById("rainCanvas");
+    if (!rainCanvas) return;
+    rainRCtx = rainCanvas.getContext("2d");
+    resizeRainCanvas();
+    window.addEventListener("resize", resizeRainCanvas);
+  }
+  function resizeRainCanvas() {
+    if (!rainCanvas) return;
+    rainCanvas.width = window.innerWidth;
+    rainCanvas.height = window.innerHeight;
+  }
+  function setRainViz(on) {
+    if (!rainCanvas) initRainViz();
+    if (!rainCanvas) return;
+    rainCanvas.style.opacity = on ? "1" : "0";
+    if (on && !rainCanvas._animating) {
+      rainCanvas._animating = true;
+      // Seed initial drops
+      for (var i = 0; i < 120; i++) {
+        rainDrops.push({
+          x: Math.random() * rainCanvas.width,
+          y: Math.random() * rainCanvas.height,
+          len: 12 + Math.random() * 22,
+          speed: 4 + Math.random() * 8,
+          opacity: 0.04 + Math.random() * 0.1
+        });
+      }
+      animateRain();
+    }
+    if (!on) {
+      rainCanvas._animating = false;
+      rainDrops = [];
+    }
+  }
+  function animateRain() {
+    if (!rainCanvas || !rainCanvas._animating) return;
+    var ctx = rainRCtx, w = rainCanvas.width, h = rainCanvas.height;
+    ctx.clearRect(0, 0, w, h);
+    for (var i = rainDrops.length - 1; i >= 0; i--) {
+      var d = rainDrops[i];
+      d.y += d.speed;
+      d.x -= d.speed * 0.15; // slight wind angle
+      if (d.y > h || d.x < -10) {
+        d.y = -d.len;
+        d.x = Math.random() * (w + 60);
+        d.len = 12 + Math.random() * 22;
+        d.speed = 4 + Math.random() * 8;
+        d.opacity = 0.04 + Math.random() * 0.1;
+      }
+      ctx.beginPath();
+      ctx.moveTo(d.x, d.y);
+      ctx.lineTo(d.x - d.len * 0.15, d.y + d.len);
+      ctx.strokeStyle = "rgba(200,210,230," + d.opacity + ")";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    requestAnimationFrame(animateRain);
   }
 
   /* ── YouTube IFrame API ── */
@@ -340,7 +612,16 @@ header { text-align: center; margin-bottom: 36px; }
       height: "100%", width: "100%",
       playerVars: { autoplay: 0, controls: 1, rel: 0, modestbranding: 1, iv_load_policy: 3 },
       events: {
-        onReady: function() { ss("Player ready"); },
+        onReady: function() {
+          rpl();
+          if (pl.length && ci >= 0 && ci < pl.length) {
+            restoreRange();
+            P.cueVideoById(pl[ci].id);
+            ss("Restored: " + pl[ci].title);
+            // Fetch fresh titles for all items
+            for (var i = 0; i < pl.length; i++) ft(pl[i].id, i);
+          } else { ss("Player ready"); }
+        },
         onStateChange: function(e) {
           if (e.data === YT.PlayerState.ENDED) {
             setVizActive(false);
@@ -471,9 +752,10 @@ header { text-align: center; margin-bottom: 36px; }
     rpl();
   };
 
-  function doClrAll() { pl = []; ci = -1; rpl(); }
+  function doClrAll() { pl = []; ci = -1; rpl(); saveState(); }
 
   function rpl() {
+    saveState();
     var c = document.getElementById("plc");
     if (!pl.length) { c.innerHTML = '<div class="ep">No videos in queue &#8212; add some!</div>'; return; }
     var h = "";
@@ -497,12 +779,14 @@ header { text-align: center; margin-bottom: 36px; }
     loop = !loop;
     document.getElementById("loopBtn").innerHTML = "&#8635; Loop: " + (loop ? "ON" : "OFF");
     ss(loop ? "Looping enabled" : "Looping disabled");
+    saveState();
   }
 
   function doShuffle() {
     shuffle = !shuffle;
     document.getElementById("shuffleBtn").innerHTML = "&#9876; Shuffle: " + (shuffle ? "ON" : "OFF");
     ss(shuffle ? "Shuffle enabled" : "Shuffle disabled");
+    saveState();
   }
 
   function doRestart() { if (P && P.seekTo) { goS(); P.playVideo(); } }
@@ -570,10 +854,23 @@ header { text-align: center; margin-bottom: 36px; }
   document.getElementById("queueBtn").addEventListener("click", doQueue);
   document.getElementById("loopBtn").addEventListener("click", doToggle);
   document.getElementById("shuffleBtn").addEventListener("click", doShuffle);
+  document.getElementById("rainBtn").addEventListener("click", doRain);
+  document.getElementById("rainVol").addEventListener("input", onRainVol);
+  // Auto-resume rain on first user interaction if it was saved as ON
+  if (rainOn) {
+    var resumeRain = function() {
+      rainStart();
+      document.removeEventListener("click", resumeRain);
+      document.removeEventListener("keydown", resumeRain);
+    };
+    document.addEventListener("click", resumeRain, { once: false });
+    document.addEventListener("keydown", resumeRain, { once: false });
+  }
   document.getElementById("restartBtn").addEventListener("click", doRestart);
   document.getElementById("nextBtn").addEventListener("click", doNext);
   document.getElementById("setRangeBtn").addEventListener("click", doSetRange);
   document.getElementById("clrRangeBtn").addEventListener("click", doClrRange);
+  document.getElementById("shareBtn").addEventListener("click", doShare);
   document.getElementById("clrAllBtn").addEventListener("click", doClrAll);
   document.getElementById("urlInput").addEventListener("keydown", function(e) {
     if (e.key === "Enter") doLoad();
