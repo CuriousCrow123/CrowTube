@@ -161,7 +161,7 @@ header { text-align: center; margin-bottom: 36px; }
 .ti::placeholder { color: var(--dim); }
 
 /* ── Playlist ── */
-.pls { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
+.pls { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
 .plh { padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
 .plt { font-family: 'DM Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); }
 .pli { overflow-y: auto; }
@@ -895,8 +895,20 @@ header { text-align: center; margin-bottom: 36px; }
   function syncQueueHeight() {
     var left = document.querySelector(".main-left");
     var pls = document.querySelector(".main-right .pls");
-    if (!left || !pls) return;
-    pls.style.height = left.offsetHeight + "px";
+    var pli = document.querySelector(".main-right .pli");
+    if (!left || !pls || !pli) return;
+    if (window.innerWidth <= 900) {
+      pls.style.height = "";
+      pli.style.maxHeight = "300px";
+    } else {
+      // Collapse queue so it can't influence left column height
+      pls.style.height = "0px";
+      pls.style.overflow = "hidden";
+      var h = left.offsetHeight;
+      pls.style.height = h + "px";
+      pls.style.overflow = "";
+      pli.style.maxHeight = "";
+    }
   }
   window.addEventListener("resize", syncQueueHeight);
 
