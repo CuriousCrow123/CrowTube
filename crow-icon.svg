@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Body -->
+  <ellipse cx="100" cy="120" rx="52" ry="48" fill="#1a1a2e"/>
+  
+  <!-- Tail feathers -->
+  <path d="M 60 138 Q 44 148 30 160 Q 48 155 62 148" fill="#16213e" stroke="#0f1626" stroke-width="1"/>
+  <path d="M 57 134 Q 38 144 22 155 Q 42 148 58 142" fill="#1a1a2e" stroke="#0f1626" stroke-width="1"/>
+  <path d="M 63 142 Q 48 154 36 168 Q 52 160 65 152" fill="#16213e" stroke="#0f1626" stroke-width="1"/>
+
+  <!-- Wing -->
+  <ellipse cx="85" cy="128" rx="36" ry="30" fill="#16213e"/>
+  <path d="M 60 115 Q 75 125 62 145" stroke="#252b4a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M 70 112 Q 82 122 72 142" stroke="#252b4a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M 80 111 Q 90 120 82 140" stroke="#252b4a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+
+  <!-- Head -->
+  <circle cx="120" cy="72" r="34" fill="#1a1a2e"/>
+  
+  <!-- Eye white -->
+  <ellipse cx="132" cy="68" rx="14" ry="15" fill="#ffffff"/>
+  
+  <!-- Iris -->
+  <circle cx="134" cy="68" r="9" fill="#2d2d2d"/>
+  
+  <!-- Pupil -->
+  <circle cx="136" cy="66" r="5" fill="#000000"/>
+  
+  <!-- Eye sparkle -->
+  <circle cx="138" cy="63" r="3" fill="#ffffff"/>
+  <circle cx="133" cy="70" r="1.5" fill="#ffffff" opacity="0.7"/>
+
+  <!-- Beak -->
+  <path d="M 148 72 L 172 78 L 148 84 Z" fill="#2a2a3e"/>
+  <path d="M 148 78 L 172 78 L 148 84 Z" fill="#1a1a2e"/>
+  
+  <!-- Blush -->
+  <ellipse cx="140" cy="84" rx="8" ry="5" fill="#e8587a" opacity="0.3"/>
+
+  <!-- Tuft / head feathers -->
+  <path d="M 108 42 Q 102 28 110 22 Q 112 34 115 40" fill="#1a1a2e"/>
+  <path d="M 115 40 Q 112 24 120 16 Q 120 30 120 38" fill="#16213e"/>
+  <path d="M 120 40 Q 120 22 130 18 Q 126 32 124 40" fill="#1a1a2e"/>
+
+  <!-- Feet -->
+  <g fill="none" stroke="#1a1a2e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 90 165 L 90 182 M 84 182 L 90 182 L 96 182"/>
+    <path d="M 110 165 L 110 182 M 104 182 L 110 182 L 116 182"/>
+  </g>
+</svg>

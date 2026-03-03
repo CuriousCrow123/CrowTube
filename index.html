@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>CrowTube</title>
+<meta name="description" content="CrowTube — a minimal YouTube video repeater with loop controls, queue management, and custom time ranges.">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;600;700&display=swap');
+:root {
+  --bg: #0a0a0f; --surface: #12121a; --s2: #1a1a26; --border: #2a2a3a;
+  --text: #e8e8f0; --dim: #7a7a90; --accent: #ff4d6a;
+  --glow: rgba(255,77,106,0.25); --green: #4dff91;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+body::before {
+  content: ''; position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
+  background: radial-gradient(ellipse at 30% 20%, rgba(255,77,106,.06) 0%, transparent 50%),
+              radial-gradient(ellipse at 70% 80%, rgba(255,138,92,.04) 0%, transparent 50%);
+  pointer-events: none; z-index: 0;
+}
+.app { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 40px 24px 60px; }
+
+/* ── Header / Logo ── */
+header { text-align: center; margin-bottom: 36px; }
+.logo {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  margin-bottom: 10px;
+}
+.logo svg.crow-icon {
+  /* Icon: 64px. Crow content is ~80% of viewBox → ~51px visual height.
+     Text at 40px/700 has cap-height ~28px. The 1.8:1 ratio
+     icon-to-text is standard for icon-wordmark logos. */
+  width: 64px; height: 64px;
+  filter: drop-shadow(0 0 12px rgba(255,77,106,0.35)) drop-shadow(0 0 4px rgba(255,77,106,0.2));
+  flex-shrink: 0;
+}
+.logo .wordmark {
+  font-family: 'Outfit', sans-serif; font-size: 40px; font-weight: 700;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, var(--text) 0%, var(--dim) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  line-height: 1;
+}
+/* ── Tagline + Visualizer combo ── */
+.tagline-wrap {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  height: 36px; margin-bottom: 0; overflow: hidden;
+}
+.tagline {
+  position: relative; z-index: 2;
+  font-family: 'DM Mono', monospace; font-size: 13px; letter-spacing: 3px;
+  color: var(--dim); text-transform: lowercase;
+}
+.tagline span { color: var(--accent); }
+
+/* ── Audio Visualizer (behind tagline) ── */
+.viz {
+  position: absolute; z-index: 1; inset: 0;
+  display: flex; align-items: flex-end; justify-content: center;
+  gap: 3px; opacity: 0.12; transition: opacity 0.6s;
+}
+.viz.active { opacity: 0.22; }
+.viz-bar {
+  width: 3px; border-radius: 2px;
+  background: linear-gradient(to top, var(--accent), rgba(255,77,106,0.15));
+  animation: viz-idle 1.8s ease-in-out infinite;
+}
+.viz.active .viz-bar { animation-name: viz-play; }
+@keyframes viz-idle {
+  0%, 100% { height: 4px; opacity: 0.4; }
+  50% { height: 10px; opacity: 0.7; }
+}
+@keyframes viz-play {
+  0%, 100% { height: 4px; }
+  25% { height: var(--h1); }
+  50% { height: var(--h2); }
+  75% { height: var(--h3); }
+}
+
+/* ── Inputs & Buttons ── */
+.ig { display: flex; gap: 10px; margin-bottom: 28px; }
+.ui {
+  flex: 1; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 18px; font-family: 'DM Mono', monospace;
+  font-size: 14px; color: var(--text); outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.ui::placeholder { color: var(--dim); }
+.ui:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
+.b {
+  font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 14px;
+  border: none; border-radius: 12px; padding: 14px 24px; cursor: pointer;
+  transition: all .2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;
+}
+.bp { background: var(--accent); color: #fff; }
+.bp:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--glow); }
+.bs { background: var(--s2); color: var(--text); border: 1px solid var(--border); }
+.bs:hover { border-color: var(--dim); }
+.bsm { font-size: 12px; padding: 8px 14px; border-radius: 8px; }
+
+/* ── Player ── */
+.pc { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 20px; }
+.pw { position: relative; padding-top: 56.25%; background: #000; }
+.pw iframe, .pw #pt-target { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+.ph {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; color: var(--dim); font-size: 14px;
+}
+.ph svg { opacity: .3; }
+
+/* ── Controls ── */
+.ctrl { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px 24px; margin-bottom: 20px; }
+.cr { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.lb {
+  font-family: 'DM Mono', monospace; font-size: 12px; padding: 6px 14px;
+  border-radius: 20px; background: rgba(77,255,145,.1); color: var(--green);
+  border: 1px solid rgba(77,255,145,.2); display: flex; align-items: center; gap: 6px;
+}
+.lb .inf { font-size: 16px; }
+.lb.ct { background: rgba(255,77,106,.1); color: var(--accent); border-color: rgba(255,77,106,.2); }
+.sep { width: 1px; height: 28px; background: var(--border); }
+.ts { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.tsl { font-family: 'DM Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); margin-bottom: 10px; }
+.tsi { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ti {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 12px; font-family: 'DM Mono', monospace; font-size: 14px;
+  color: var(--text); width: 100px; text-align: center; outline: none;
+}
+.ti:focus { border-color: var(--accent); }
+.ti::placeholder { color: var(--dim); }
+
+/* ── Playlist ── */
+.pls { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.plh { padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+.plt { font-family: 'DM Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); }
+.pli { max-height: 300px; overflow-y: auto; }
+.pli::-webkit-scrollbar { width: 4px; }
+.pli::-webkit-scrollbar-track { background: transparent; }
+.pli::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.pi {
+  padding: 12px 24px; display: flex; align-items: center; gap: 14px;
+  cursor: pointer; transition: background .15s; border-bottom: 1px solid rgba(42,42,58,.5);
+}
+.pi:hover { background: var(--s2); }
+.pi.ac { background: rgba(255,77,106,.08); border-left: 3px solid var(--accent); padding-left: 21px; }
+.pi .ix { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--dim); min-width: 20px; }
+.pi.ac .ix { color: var(--accent); }
+.pi .tt { flex: 1; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pi .rm {
+  opacity: 0; color: var(--dim); font-size: 18px; background: none; border: none;
+  cursor: pointer; transition: opacity .15s; padding: 0 4px;
+}
+.pi:hover .rm { opacity: 1; }
+.pi .rm:hover { color: var(--accent); }
+.ep { padding: 32px; text-align: center; color: var(--dim); font-size: 13px; }
+.st { text-align: center; margin-top: 20px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--dim); }
+
+/* ── file:// warning banner ── */
+.file-warning {
+  position: fixed; inset: 0; z-index: 9999; background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+}
+.file-warning-box {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+  padding: 48px 40px; max-width: 520px; text-align: center;
+}
+.file-warning-box h2 { font-size: 22px; margin-bottom: 12px; font-weight: 600; }
+.file-warning-box p { color: var(--dim); font-size: 14px; line-height: 1.7; margin-bottom: 24px; }
+.file-warning-box code {
+  display: block; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 18px; font-family: 'DM Mono', monospace;
+  font-size: 13px; color: var(--green); margin: 16px 0 24px; text-align: left;
+  word-break: break-all; user-select: all; cursor: text;
+}
+.file-warning-box .copy-hint {
+  font-family: 'DM Mono', monospace; font-size: 11px; color: var(--dim);
+  margin-top: -16px; margin-bottom: 20px;
+}
+.file-warning-box .steps { text-align: left; color: var(--dim); font-size: 13px; line-height: 2; margin-bottom: 20px; }
+.file-warning-box .steps span { color: var(--accent); font-weight: 600; }
+
+@media (max-width: 600px) {
+  .app { padding: 24px 16px 40px; }
+  .ig { flex-direction: column; }
+  .logo svg.crow-icon { width: 48px; height: 48px; }
+  .logo .wordmark { font-size: 30px; }
+  .file-warning-box { margin: 20px; padding: 32px 24px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── file:// origin warning ── -->
+<div class="file-warning" id="fileWarning" style="display:none">
+  <div class="file-warning-box">
+    <div class="logo" style="margin-bottom:16px">
+      <svg class="crow-icon" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="120" rx="52" ry="48" fill="#1a1a2e"/><path d="M 60 138 Q 44 148 30 160 Q 48 155 62 148" fill="#16213e" stroke="#0f1626" stroke-width="1"/><path d="M 57 134 Q 38 144 22 155 Q 42 148 58 142" fill="#1a1a2e" stroke="#0f1626" stroke-width="1"/><path d="M 63 142 Q 48 154 36 168 Q 52 160 65 152" fill="#16213e" stroke="#0f1626" stroke-width="1"/><ellipse cx="85" cy="128" rx="36" ry="30" fill="#16213e"/><path d="M 60 115 Q 75 125 62 145" stroke="#252b4a" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M 70 112 Q 82 122 72 142" stroke="#252b4a" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M 80 111 Q 90 120 82 140" stroke="#252b4a" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="120" cy="72" r="34" fill="#1a1a2e"/><ellipse cx="132" cy="68" rx="14" ry="15" fill="#ffffff"/><circle cx="134" cy="68" r="9" fill="#2d2d2d"/><circle cx="136" cy="66" r="5" fill="#000000"/><circle cx="138" cy="63" r="3" fill="#ffffff"/><circle cx="133" cy="70" r="1.5" fill="#ffffff" opacity="0.7"/><path d="M 148 72 L 172 78 L 148 84 Z" fill="#2a2a3e"/><path d="M 148 78 L 172 78 L 148 84 Z" fill="#1a1a2e"/><ellipse cx="140" cy="84" rx="8" ry="5" fill="#e8587a" opacity="0.3"/><path d="M 108 42 Q 102 28 110 22 Q 112 34 115 40" fill="#1a1a2e"/><path d="M 115 40 Q 112 24 120 16 Q 120 30 120 38" fill="#16213e"/><path d="M 120 40 Q 120 22 130 18 Q 126 32 124 40" fill="#1a1a2e"/><g fill="none" stroke="#1a1a2e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M 90 165 L 90 182 M 84 182 L 90 182 L 96 182"/><path d="M 110 165 L 110 182 M 104 182 L 110 182 L 116 182"/></g></svg>
+      <span class="wordmark">CrowTube</span>
+    </div>
+    <h2>Local Server Required</h2>
+    <p>YouTube blocks embeds from <strong>file://</strong> origins (Error 153). This page needs to run from a web server. It's a one-liner:</p>
+    <div class="steps">
+      <span>1.</span> Open Terminal / Command Prompt<br>
+      <span>2.</span> <strong>cd</strong> to the folder containing this file<br>
+      <span>3.</span> Run one of these commands:
+    </div>
+    <code>python3 -m http.server 8080</code>
+    <div class="copy-hint">click to select &middot; then Cmd/Ctrl+C to copy</div>
+    <p style="margin-bottom:8px">Then open: <a href="http://localhost:8080" style="color:var(--accent);text-decoration:none;font-weight:600">localhost:8080</a></p>
+    <p style="font-size:12px;color:var(--dim);margin-bottom:0">Alternatives: <span style="color:var(--text)">npx serve</span> &middot; <span style="color:var(--text)">php -S localhost:8080</span> &middot; VS Code Live Server</p>
+  </div>
+</div>
+
+<div class="app" id="mainApp">
+  <header>
+    <div class="logo">
+      <svg class="crow-icon" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="120" rx="52" ry="48" fill="#1a1a2e"/><path d="M 60 138 Q 44 148 30 160 Q 48 155 62 148" fill="#16213e" stroke="#0f1626" stroke-width="1"/><path d="M 57 134 Q 38 144 22 155 Q 42 148 58 142" fill="#1a1a2e" stroke="#0f1626" stroke-width="1"/><path d="M 63 142 Q 48 154 36 168 Q 52 160 65 152" fill="#16213e" stroke="#0f1626" stroke-width="1"/><ellipse cx="85" cy="128" rx="36" ry="30" fill="#16213e"/><path d="M 60 115 Q 75 125 62 145" stroke="#252b4a" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M 70 112 Q 82 122 72 142" stroke="#252b4a" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M 80 111 Q 90 120 82 140" stroke="#252b4a" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="120" cy="72" r="34" fill="#1a1a2e"/><ellipse cx="132" cy="68" rx="14" ry="15" fill="#ffffff"/><circle cx="134" cy="68" r="9" fill="#2d2d2d"/><circle cx="136" cy="66" r="5" fill="#000000"/><circle cx="138" cy="63" r="3" fill="#ffffff"/><circle cx="133" cy="70" r="1.5" fill="#ffffff" opacity="0.7"/><path d="M 148 72 L 172 78 L 148 84 Z" fill="#2a2a3e"/><path d="M 148 78 L 172 78 L 148 84 Z" fill="#1a1a2e"/><ellipse cx="140" cy="84" rx="8" ry="5" fill="#e8587a" opacity="0.3"/><path d="M 108 42 Q 102 28 110 22 Q 112 34 115 40" fill="#1a1a2e"/><path d="M 115 40 Q 112 24 120 16 Q 120 30 120 38" fill="#16213e"/><path d="M 120 40 Q 120 22 130 18 Q 126 32 124 40" fill="#1a1a2e"/><g fill="none" stroke="#1a1a2e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M 90 165 L 90 182 M 84 182 L 90 182 L 96 182"/><path d="M 110 165 L 110 182 M 104 182 L 110 182 L 116 182"/></g></svg>
+      <span class="wordmark">CrowTube</span>
+    </div>
+    <div class="tagline-wrap">
+      <div class="viz" id="viz"></div>
+      <p class="tagline">queue <span>&middot;</span> play <span>&middot;</span> repeat</p>
+    </div>
+  </header>
+
+  <div class="ig">
+    <input type="text" class="ui" id="urlInput" placeholder="Paste YouTube URL or video ID..." />
+    <button class="b bp" id="playBtn">&#9654; Play</button>
+    <button class="b bs" id="queueBtn">+ Queue</button>
+  </div>
+
+  <div class="pc">
+    <div class="pw" id="pw">
+      <div id="pt-target"></div>
+      <div class="ph" id="ph">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+        </svg>
+        Paste a URL above to get started
+      </div>
+    </div>
+  </div>
+
+  <div class="ctrl">
+    <div class="cr">
+      <button class="b bs bsm" id="loopBtn">&#8635; Loop: ON</button>
+      <div class="lb" id="lc"><span class="inf">&#8734;</span> loops</div>
+      <div class="sep"></div>
+      <button class="b bs bsm" id="restartBtn">&#8634; Restart</button>
+      <button class="b bs bsm" id="nextBtn">Next &#9658;</button>
+    </div>
+    <div class="ts">
+      <div class="tsl">Loop Range (optional)</div>
+      <div class="tsi">
+        <input type="text" class="ti" id="sTime" placeholder="0:00" />
+        <span style="color:var(--dim);font-size:18px">&#8594;</span>
+        <input type="text" class="ti" id="eTime" placeholder="end" />
+        <button class="b bs bsm" id="setRangeBtn">Set Range</button>
+        <button class="b bs bsm" id="clrRangeBtn">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pls">
+    <div class="plh">
+      <span class="plt">Queue</span>
+      <button class="b bs bsm" id="clrAllBtn">Clear All</button>
+    </div>
+    <div class="pli" id="plc">
+      <div class="ep">No videos in queue &#8212; add some!</div>
+    </div>
+  </div>
+
+  <div class="st" id="st">Ready</div>
+</div>
+
+<script>
+(function() {
+  /* ── Build visualizer bars ── */
+  var vizEl = document.getElementById("viz");
+  if (vizEl) {
+    // 24 bars with pseudo-random heights for organic feel
+    var barCount = 24;
+    for (var b = 0; b < barCount; b++) {
+      var bar = document.createElement("div");
+      bar.className = "viz-bar";
+      // Use sine-based offsets so neighboring bars look natural
+      var phase = (b / barCount) * Math.PI * 2;
+      var h1 = Math.round(6 + 18 * Math.abs(Math.sin(phase * 2.3)));
+      var h2 = Math.round(4 + 20 * Math.abs(Math.sin(phase * 1.7 + 1)));
+      var h3 = Math.round(5 + 16 * Math.abs(Math.sin(phase * 3.1 + 2)));
+      bar.style.setProperty("--h1", h1 + "px");
+      bar.style.setProperty("--h2", h2 + "px");
+      bar.style.setProperty("--h3", h3 + "px");
+      bar.style.animationDelay = (b * 0.08) + "s";
+      bar.style.animationDuration = (1.2 + (b % 5) * 0.15) + "s";
+      vizEl.appendChild(bar);
+    }
+  }
+
+  /* ── Detect file:// and show instructions ── */
+  if (window.location.protocol === "file:") {
+    document.getElementById("fileWarning").style.display = "flex";
+    document.getElementById("mainApp").style.display = "none";
+    return;
+  }
+
+  /* ── State ── */
+  var P = null, loop = true, lc = 0, pl = [], ci = -1, ls = null, le = null, rci = null;
+
+  function setVizActive(on) {
+    var v = document.getElementById("viz");
+    if (v) { if (on) v.classList.add("active"); else v.classList.remove("active"); }
+  }
+
+  /* ── YouTube IFrame API ── */
+  var s = document.createElement("script");
+  s.src = "https://www.youtube.com/iframe_api";
+  document.head.appendChild(s);
+
+  window.onYouTubeIframeAPIReady = function() {
+    P = new YT.Player("pt-target", {
+      height: "100%", width: "100%",
+      playerVars: { autoplay: 0, controls: 1, rel: 0, modestbranding: 1, iv_load_policy: 3 },
+      events: {
+        onReady: function() { ss("Player ready"); },
+        onStateChange: function(e) {
+          if (e.data === YT.PlayerState.ENDED) {
+            setVizActive(false);
+            if (loop) { goS(); P.playVideo(); lc++; ub(); }
+            else { doNext(); }
+          }
+          if (e.data === YT.PlayerState.PLAYING) {
+            document.getElementById("ph").style.display = "none";
+            setVizActive(true);
+            startRC();
+          } else if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.BUFFERING) {
+            setVizActive(false);
+            stopRC();
+          }
+        }
+      }
+    });
+  };
+
+  function startRC() {
+    stopRC();
+    if (le !== null) {
+      rci = setInterval(function() {
+        if (P && P.getCurrentTime && le !== null && P.getCurrentTime() >= le) {
+          lc++; ub(); goS();
+        }
+      }, 250);
+    }
+  }
+  function stopRC() { if (rci) { clearInterval(rci); rci = null; } }
+  function goS() { P.seekTo(ls || 0, true); }
+
+  function vid(s) {
+    s = s.trim();
+    if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+    var patterns = [
+      /(?:youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})/,
+      /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+      /(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+      /(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/
+    ];
+    for (var i = 0; i < patterns.length; i++) {
+      var m = s.match(patterns[i]);
+      if (m) return m[1];
+    }
+    return null;
+  }
+
+  function doLoad() {
+    var input = document.getElementById("urlInput").value;
+    var id = vid(input);
+    if (!id) { ss("Invalid YouTube URL"); return; }
+    lc = 0; ub(); doClrRange();
+    if (P && P.loadVideoById) P.loadVideoById(id);
+    var ex = -1;
+    for (var i = 0; i < pl.length; i++) { if (pl[i].id === id) { ex = i; break; } }
+    if (ex === -1) { pl.push({ id: id, title: "Video " + id }); ci = pl.length - 1; }
+    else { ci = ex; }
+    rpl(); ss("Playing " + id); ft(id, ci);
+  }
+
+  function ft(v, idx) {
+    fetch("https://noembed.com/embed?url=https://www.youtube.com/watch?v=" + v)
+      .then(function(r) { return r.json(); })
+      .then(function(d) { if (d.title && pl[idx]) { pl[idx].title = d.title; rpl(); } })
+      .catch(function() {});
+  }
+
+  function doQueue() {
+    var input = document.getElementById("urlInput").value;
+    var id = vid(input);
+    if (!id) { ss("Invalid YouTube URL"); return; }
+    for (var i = 0; i < pl.length; i++) { if (pl[i].id === id) { ss("Already in queue"); return; } }
+    var idx = pl.length;
+    pl.push({ id: id, title: "Video " + id });
+    rpl(); ss("Added to queue");
+    document.getElementById("urlInput").value = "";
+    ft(id, idx);
+  }
+
+  window.playIdx = function(i) {
+    if (i < 0 || i >= pl.length) return;
+    ci = i; lc = 0; ub(); doClrRange();
+    P.loadVideoById(pl[i].id);
+    rpl(); ss("Playing: " + pl[i].title);
+  };
+
+  function doNext() {
+    if (!pl.length) return;
+    window.playIdx((ci + 1) % pl.length);
+  }
+
+  window.rmPL = function(i) {
+    pl.splice(i, 1);
+    if (ci >= pl.length) ci = pl.length - 1;
+    rpl();
+  };
+
+  function doClrAll() { pl = []; ci = -1; rpl(); }
+
+  function rpl() {
+    var c = document.getElementById("plc");
+    if (!pl.length) { c.innerHTML = '<div class="ep">No videos in queue &#8212; add some!</div>'; return; }
+    var h = "";
+    for (var i = 0; i < pl.length; i++) {
+      h += '<div class="pi' + (i === ci ? ' ac' : '') + '" onclick="playIdx(' + i + ')">';
+      h += '<span class="ix">' + String(i + 1).padStart(2, "0") + '</span>';
+      h += '<span class="tt">' + esc(pl[i].title) + '</span>';
+      h += '<button class="rm" onclick="event.stopPropagation();rmPL(' + i + ')">&#215;</button>';
+      h += '</div>';
+    }
+    c.innerHTML = h;
+  }
+
+  function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+  function doToggle() {
+    loop = !loop;
+    document.getElementById("loopBtn").innerHTML = "&#8635; Loop: " + (loop ? "ON" : "OFF");
+    ss(loop ? "Looping enabled" : "Looping disabled");
+  }
+
+  function doRestart() { if (P && P.seekTo) { goS(); P.playVideo(); } }
+
+  function pT(s) {
+    if (!s || !s.trim()) return null;
+    var p = s.trim().split(":").map(Number);
+    if (p.some(isNaN)) return null;
+    if (p.length === 1) return p[0];
+    if (p.length === 2) return p[0] * 60 + p[1];
+    if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
+    return null;
+  }
+
+  function fT(n) {
+    if (n === null) return "";
+    return Math.floor(n / 60) + ":" + String(Math.floor(n % 60)).padStart(2, "0");
+  }
+
+  function doSetRange() {
+    var a = pT(document.getElementById("sTime").value);
+    var b = pT(document.getElementById("eTime").value);
+    ls = a; le = b;
+    if (a !== null) document.getElementById("sTime").value = fT(a);
+    if (b !== null) document.getElementById("eTime").value = fT(b);
+    if (a !== null && P) P.seekTo(a, true);
+    startRC();
+    ss("Range: " + fT(a || 0) + " &#8594; " + (b !== null ? fT(b) : "end"));
+  }
+
+  function doClrRange() {
+    ls = null; le = null;
+    document.getElementById("sTime").value = "";
+    document.getElementById("eTime").value = "";
+    stopRC();
+  }
+
+  function ub() {
+    var b = document.getElementById("lc");
+    if (lc === 0) { b.className = "lb"; b.innerHTML = '<span class="inf">&#8734;</span> loops'; }
+    else { b.className = "lb ct"; b.innerHTML = lc + " loop" + (lc !== 1 ? "s" : ""); }
+  }
+
+  function ss(m) { document.getElementById("st").innerHTML = m; }
+
+  document.getElementById("playBtn").addEventListener("click", doLoad);
+  document.getElementById("queueBtn").addEventListener("click", doQueue);
+  document.getElementById("loopBtn").addEventListener("click", doToggle);
+  document.getElementById("restartBtn").addEventListener("click", doRestart);
+  document.getElementById("nextBtn").addEventListener("click", doNext);
+  document.getElementById("setRangeBtn").addEventListener("click", doSetRange);
+  document.getElementById("clrRangeBtn").addEventListener("click", doClrRange);
+  document.getElementById("clrAllBtn").addEventListener("click", doClrAll);
+  document.getElementById("urlInput").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") doLoad();
+  });
+})();
+</script>
+</body>
+</html>
