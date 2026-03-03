@@ -651,6 +651,7 @@ header { text-align: center; margin-bottom: 36px; }
           if (e.data === YT.PlayerState.PLAYING) {
             document.getElementById("ph").style.display = "none";
             setVizActive(true);
+            if (ci >= 0 && pl[ci]) ss("Playing: " + pl[ci].title);
             startRC();
           } else if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.BUFFERING) {
             setVizActive(false);
@@ -670,6 +671,7 @@ header { text-align: center; margin-bottom: 36px; }
     /* Shared logic: advance to next video or loop back */
     if (pl.length <= 1) {
       if (loop) { goS(); P.playVideo(); lc++; ub(); }
+      else { P.pauseVideo(); ss("Queue finished"); setVizActive(false); }
     } else if (shuffle) {
       var pick = ci;
       while (pick === ci && pl.length > 1) pick = Math.floor(Math.random() * pl.length);
@@ -681,6 +683,8 @@ header { text-align: center; margin-bottom: 36px; }
       } else if (loop) {
         lc++; ub();
         window.playIdx(0);
+      } else {
+        P.pauseVideo(); ss("Queue finished"); setVizActive(false);
       }
     }
     setTimeout(function() { advancing = false; }, 500);
