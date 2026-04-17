@@ -257,13 +257,11 @@
       document.getElementById("birds-vol").value = Math.round(birdsVolume * 100);
       if (birdsAudio) birdsAudio.volume = birdsVolume;
     }
-    if (data.title) {
-      playlistTitle = data.title;
-      var label = document.querySelector(".queue-title.share-label");
-      if (label) label.textContent = playlistTitle;
-      var btnText = document.querySelector(".share-btn-text");
-      if (btnText) btnText.textContent = playlistTitle;
-    }
+    playlistTitle = data.title || "Playlist";
+    var label = document.querySelector(".queue-title.share-label");
+    if (label) label.textContent = playlistTitle;
+    var btnText = document.querySelector(".share-btn-text");
+    if (btnText) btnText.textContent = playlistTitle;
     if (rainOn) startRain();
     if (birdsOn) startBirds();
     history.replaceState(null, "", window.location.pathname);
