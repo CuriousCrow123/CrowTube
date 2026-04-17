@@ -72,8 +72,10 @@
             <input type="range" class="rain-vol" id="rain-vol" min="0" max="100" value="30" />
           </div>
           <div class="separator"></div>
-          <button class="btn btn-secondary btn-small" id="restart-btn">&#8634; Restart</button>
-          <button class="btn btn-secondary btn-small" id="next-btn">Next &#9658;</button>
+          <div class="birds-wrap">
+            <button class="btn btn-secondary btn-small" id="birds-btn">&#128330; Birds</button>
+            <input type="range" class="birds-vol" id="birds-vol" min="0" max="100" value="30" />
+          </div>
         </div>
         <div class="range-section">
           <div class="range-label">Play Range</div>
@@ -107,6 +109,40 @@
 <div class="toast" id="toast"></div>
 <canvas id="rain-canvas" class="rain-canvas"></canvas>
 <audio id="rain-audio" loop preload="auto" src="liecio-light-rain-109591.mp3" style="display:none"></audio>
+<audio id="birds-audio" loop preload="auto" src="freesound_community-birds-19624.mp3" style="display:none"></audio>
+
+<div class="theme-fab" id="theme-toggle" title="Change theme">
+  <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+</div>
+<div class="theme-picker" id="theme-picker">
+  <div class="theme-picker-title">Theme</div>
+  <button class="theme-option" data-theme="auto">
+    <span class="theme-swatch theme-swatch-auto"><span></span><span></span><span></span><span></span></span>
+    <span class="theme-option-label">Auto</span>
+    <span class="theme-option-hint">Follows time of day</span>
+  </button>
+  <button class="theme-option" data-theme="morning">
+    <span class="theme-swatch" style="background:linear-gradient(135deg,#eef3ec,#c8d4c4)"></span>
+    <span class="theme-option-label">Morning</span>
+    <span class="theme-option-hint">6 am &#8211; 10 am</span>
+  </button>
+  <button class="theme-option" data-theme="day">
+    <span class="theme-swatch" style="background:linear-gradient(135deg,#eaf2fb,#c6d6ea)"></span>
+    <span class="theme-option-label">Clear Sky</span>
+    <span class="theme-option-hint">10 am &#8211; 5 pm</span>
+  </button>
+  <button class="theme-option" data-theme="sunset">
+    <span class="theme-swatch" style="background:linear-gradient(135deg,#fdf4ec,#e4d4c0)"></span>
+    <span class="theme-option-label">Golden Hour</span>
+    <span class="theme-option-hint">5 pm &#8211; 8 pm</span>
+  </button>
+  <button class="theme-option" data-theme="night">
+    <span class="theme-swatch" style="background:linear-gradient(135deg,#12121a,#2a2a3a)"></span>
+    <span class="theme-option-label">Night</span>
+    <span class="theme-option-hint">8 pm &#8211; 6 am</span>
+  </button>
+</div>
 
 <script src="app.js"></script>
 </body>
