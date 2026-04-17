@@ -168,13 +168,6 @@ header { text-align: center; margin-bottom: 36px; }
 /* ── Controls ── */
 .controls { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px 24px; margin-bottom: 20px; }
 .controls-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.loop-badge {
-  font-family: 'DM Mono', monospace; font-size: 12px; padding: 6px 14px;
-  border-radius: 20px; background: rgba(77,255,145,.1); color: var(--green);
-  border: 1px solid rgba(77,255,145,.2); display: flex; align-items: center; gap: 6px;
-}
-.loop-badge .inf { font-size: 16px; }
-.loop-badge.counting { background: rgba(255,77,106,.1); color: var(--accent); border-color: rgba(255,77,106,.2); }
 .separator { width: 1px; height: 28px; background: var(--border); }
 .range-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
 .range-label { font-family: 'DM Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); margin-bottom: 10px; }

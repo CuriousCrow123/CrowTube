@@ -45,7 +45,6 @@
 
   <div class="input-group">
     <input type="text" class="url-input" id="url-input" placeholder="Paste YouTube URL or video ID..." />
-    <button class="btn btn-primary" id="play-btn">&#9654; Play</button>
     <button class="btn btn-secondary" id="queue-btn">+ Queue</button>
   </div>
 
@@ -65,7 +64,6 @@
       <div class="controls">
         <div class="controls-row">
           <button class="btn btn-secondary btn-small" id="loop-btn">&#8635; Loop: ON</button>
-          <div class="loop-badge" id="loop-badge"><span class="inf">&#8734;</span> loops</div>
           <div class="separator"></div>
           <button class="btn btn-secondary btn-small" id="shuffle-btn">&#9876; Shuffle: OFF</button>
           <div class="separator"></div>
@@ -92,7 +90,7 @@
     <div class="main-right">
       <div class="queue-panel">
         <div class="queue-header">
-          <span class="queue-title share-label" contenteditable="true" spellcheck="false">Queue</span>
+          <span class="queue-title share-label" contenteditable="true" spellcheck="false">Playlist</span>
           <div style="display:flex;gap:8px;align-items:center">
             <span class="share-btn-wrap"><a class="btn share-btn" id="share-btn" href="#" draggable="true"><span class="share-btn-text">Queue</span></a><span class="share-tooltip">Drag to bookmark!</span></span>
             <button class="btn btn-secondary btn-small" id="clear-all-btn">Clear All</button>

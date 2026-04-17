@@ -53,7 +53,7 @@
   var loadedFromShare = false;    // True when queue was imported from a share link
   var loopEnabled = true;         // Queue looping on/off
   var shuffleEnabled = false;     // Shuffle mode on/off
-  var loopCount = 0;              // Number of full queue loops completed
+
   var shufflePlayed = {};         // Tracks indices played in current shuffle round
 
   var rangeStart = null;          // Play range start (seconds)
@@ -65,7 +65,7 @@
   var rainVolume = 0.3;           // Rain volume (0–1)
   var rainFadeInterval = null;    // Rain volume fade interval ID
 
-  var playlistTitle = "Queue";    // User-editable playlist name
+  var playlistTitle = "Playlist";    // User-editable playlist name
 
   var advancing = false;          // Guard against re-entrance in advanceQueue
   var rangeCheckStopping = false; // Guard for range-check stop race condition
@@ -127,16 +127,7 @@
     }, 1800);
   }
 
-  function updateLoopBadge() {
-    var badge = document.getElementById("loop-badge");
-    if (loopCount === 0) {
-      badge.className = "loop-badge";
-      badge.innerHTML = '<span class="inf">&#8734;</span> loops';
-    } else {
-      badge.className = "loop-badge counting";
-      badge.innerHTML = loopCount + " loop" + (loopCount !== 1 ? "s" : "");
-    }
-  }
+
 
   function showToast(msg) {
     var t = document.getElementById("toast");
@@ -159,7 +150,7 @@
       parts.push(part);
     }
     var hash = parts.join("|");
-    if (playlistTitle && playlistTitle !== "Queue") hash += "&t=" + encodeURIComponent(playlistTitle);
+    if (playlistTitle && playlistTitle !== "Playlist") hash += "&t=" + encodeURIComponent(playlistTitle);
     if (rainOn) hash += "&rain=1&rvol=" + Math.round(rainVolume * 100);
     return hash;
   }
@@ -457,8 +448,6 @@
     }
     if (remaining.length === 0) {
       if (loopEnabled) {
-        loopCount++;
-        updateLoopBadge();
         shufflePlayed = {};
         for (var j = 0; j < playlist.length; j++) {
           if (j !== currentIndex) remaining.push(j);
@@ -476,7 +465,7 @@
     stopRangeChecker();
 
     if (playlist.length <= 1) {
-      if (loopEnabled) { seekToStart(); player.playVideo(); loopCount++; updateLoopBadge(); }
+      if (loopEnabled) { seekToStart(); player.playVideo(); }
       else { finishQueue(); }
     } else if (shuffleEnabled) {
       var pick = shufflePick();
@@ -487,8 +476,6 @@
       if (next < playlist.length) {
         playVideoAtIndex(next);
       } else if (loopEnabled) {
-        loopCount++;
-        updateLoopBadge();
         playVideoAtIndex(0);
       } else {
         finishQueue();
@@ -531,7 +518,6 @@
     if (index < 0 || index >= playlist.length) return;
     if (!player || !player.loadVideoById) { setStatus("Player not ready"); return; }
     currentIndex = index;
-    if (manual) { loopCount = 0; updateLoopBadge(); }
     restoreRange();
     player.loadVideoById({ videoId: playlist[index].id, startSeconds: rangeStart || 0 });
     renderPlaylist();
@@ -579,8 +565,6 @@
     var input = document.getElementById("url-input").value;
     var id = extractVideoId(input);
     if (!id) { setStatus("Invalid YouTube URL"); return; }
-    loopCount = 0;
-    updateLoopBadge();
     var existingIndex = -1;
     for (var i = 0; i < playlist.length; i++) { if (playlist[i].id === id) { existingIndex = i; break; } }
     if (existingIndex === -1) { addVideoToQueue(id); currentIndex = playlist.length - 1; }
@@ -937,7 +921,6 @@
   loadYouTubeAPI();
 
   // Bind event listeners
-  document.getElementById("play-btn").addEventListener("click", handlePlay);
   document.getElementById("queue-btn").addEventListener("click", handleQueue);
   document.getElementById("loop-btn").addEventListener("click", toggleLoop);
   document.getElementById("shuffle-btn").addEventListener("click", toggleShuffle);
@@ -954,7 +937,7 @@
   shareLabel.textContent = playlistTitle;
   shareBtnText.textContent = playlistTitle;
   function syncShareLabel() {
-    playlistTitle = shareLabel.textContent || "Queue";
+    playlistTitle = shareLabel.textContent || "Playlist";
     shareBtnText.textContent = playlistTitle;
     shareBtn.href = buildShareUrl() || "#";
     saveState();
