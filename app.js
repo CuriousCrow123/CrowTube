@@ -362,12 +362,14 @@
     document.getElementById("rain-vol").classList.toggle("show", rainOn);
     if (rainOn) startRain(); else stopRain();
     saveState();
+    updateShareLink();
   }
 
   function handleRainVolume(e) {
     rainVolume = e.target.value / 100;
     if (rainOn && rainAudio) rainAudio.volume = rainVolume;
     saveState();
+    updateShareLink();
   }
 
   /* ── Birds Audio ── */
@@ -415,12 +417,14 @@
     document.getElementById("birds-vol").classList.toggle("show", birdsOn);
     if (birdsOn) startBirds(); else stopBirds();
     saveState();
+    updateShareLink();
   }
 
   function handleBirdsVolume(e) {
     birdsVolume = e.target.value / 100;
     if (birdsOn && birdsAudio) birdsAudio.volume = birdsVolume;
     saveState();
+    updateShareLink();
   }
 
   /* ── Theme ── */
