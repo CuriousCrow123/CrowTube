@@ -204,6 +204,19 @@
     });
   }
 
+  function buildShareUrl() {
+    var hash = encodeShareHash();
+    if (!hash) return null;
+    return window.location.origin + window.location.pathname + "#" + hash;
+  }
+
+  function updateShareLink() {
+    var link = document.getElementById("share-btn");
+    if (!link) return;
+    var url = buildShareUrl();
+    link.href = url || "#";
+  }
+
   function loadFromHash() {
     var raw = window.location.hash.slice(1);
     if (!raw) return false;
@@ -704,6 +717,7 @@
     if (!playlist.length) {
       container.innerHTML = '<div class="queue-empty">No videos in queue &#8212; add some!</div>';
       syncQueueHeight();
+      updateShareLink();
       return;
     }
     var html = "";
@@ -722,6 +736,7 @@
     }
     container.innerHTML = html;
     syncQueueHeight();
+    updateShareLink();
   }
 
   window.removeFromPlaylist = function (i) {
@@ -903,7 +918,17 @@
   document.getElementById("next-btn").addEventListener("click", handleNext);
   document.getElementById("set-range-btn").addEventListener("click", handleSetRange);
   document.getElementById("clear-range-btn").addEventListener("click", handleClearRange);
-  document.getElementById("share-btn").addEventListener("click", handleShare);
+  document.getElementById("share-btn").addEventListener("click", function (e) { e.preventDefault(); handleShare(); });
+  document.getElementById("share-btn").addEventListener("dragstart", function () {
+    var url = buildShareUrl();
+    if (url) {
+      this.href = url;
+      this.innerHTML = "&#128279; CrowTube (" + playlist.length + " video" + (playlist.length !== 1 ? "s" : "") + ")";
+    }
+  });
+  document.getElementById("share-btn").addEventListener("dragend", function () {
+    this.innerHTML = "&#128279; Playlist";
+  });
   document.getElementById("clear-all-btn").addEventListener("click", handleClearAll);
   document.getElementById("url-input").addEventListener("keydown", function (e) {
     if (e.key === "Enter") handlePlay();
