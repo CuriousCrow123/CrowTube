@@ -65,6 +65,13 @@
   var rainVolume = 0.3;           // Rain volume (0–1)
   var rainFadeInterval = null;    // Rain volume fade interval ID
 
+  var birdsAudio = null;
+  var birdsOn = false;
+  var birdsVolume = 0.3;
+  var birdsFadeInterval = null;
+
+  var themeMode = "auto";
+  var currentThemeClass = "";
   var playlistTitle = "Playlist";    // User-editable playlist name
 
   var advancing = false;          // Guard against re-entrance in advanceQueue
@@ -77,7 +84,8 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         pl: playlist, ci: currentIndex, loop: loopEnabled,
         shuffle: shuffleEnabled, rainOn: rainOn, rainVol: rainVolume,
-        title: playlistTitle
+        birdsOn: birdsOn, birdsVol: birdsVolume,
+        title: playlistTitle, theme: themeMode
       }));
     } catch (e) {}
   }
@@ -92,7 +100,10 @@
         if (typeof data.shuffle === "boolean") shuffleEnabled = data.shuffle;
         if (typeof data.rainOn === "boolean") rainOn = data.rainOn;
         if (typeof data.rainVol === "number") rainVolume = data.rainVol;
+        if (typeof data.birdsOn === "boolean") birdsOn = data.birdsOn;
+        if (typeof data.birdsVol === "number") birdsVolume = data.birdsVol;
         if (typeof data.title === "string") playlistTitle = data.title;
+        if (typeof data.theme === "string" && /^(auto|morning|day|sunset|night)$/.test(data.theme)) themeMode = data.theme;
       }
     } catch (e) {}
   }
@@ -152,6 +163,7 @@
     var hash = parts.join("|");
     if (playlistTitle && playlistTitle !== "Playlist") hash += "&t=" + encodeURIComponent(playlistTitle);
     if (rainOn) hash += "&rain=1&rvol=" + Math.round(rainVolume * 100);
+    if (birdsOn) hash += "&birds=1&bvol=" + Math.round(birdsVolume * 100);
     return hash;
   }
 
@@ -186,7 +198,9 @@
     var rvol = flags.rvol !== undefined ? Number(flags.rvol) / 100 : null;
     if (rvol !== null && (isNaN(rvol) || rvol < 0 || rvol > 1)) rvol = null;
     var title = flags.t ? decodeURIComponent(flags.t) : null;
-    return { videos: result, rain: flags.rain === "1", rainVol: rvol, title: title };
+    var bvol = flags.bvol !== undefined ? Number(flags.bvol) / 100 : null;
+    if (bvol !== null && (isNaN(bvol) || bvol < 0 || bvol > 1)) bvol = null;
+    return { videos: result, rain: flags.rain === "1", rainVol: rvol, birds: flags.birds === "1", birdsVol: bvol, title: title };
   }
 
   function handleShare() {
@@ -233,6 +247,16 @@
       document.getElementById("rain-vol").value = Math.round(rainVolume * 100);
       if (rainAudio) rainAudio.volume = rainVolume;
     }
+    if (data.birds && !birdsOn) {
+      birdsOn = true;
+      document.getElementById("birds-btn").innerHTML = "&#128330; Birds: ON";
+      document.getElementById("birds-vol").classList.add("show");
+    }
+    if (data.birdsVol !== null) {
+      birdsVolume = data.birdsVol;
+      document.getElementById("birds-vol").value = Math.round(birdsVolume * 100);
+      if (birdsAudio) birdsAudio.volume = birdsVolume;
+    }
     if (data.title) {
       playlistTitle = data.title;
       var label = document.querySelector(".queue-title.share-label");
@@ -241,6 +265,7 @@
       if (btnText) btnText.textContent = playlistTitle;
     }
     if (rainOn) startRain();
+    if (birdsOn) startBirds();
     history.replaceState(null, "", window.location.pathname);
     renderPlaylist();
     if (player && player.loadVideoById) {
@@ -347,6 +372,110 @@
     saveState();
   }
 
+  /* ── Birds Audio ── */
+
+  function initBirdsAudio() {
+    if (birdsAudio) return;
+    birdsAudio = document.getElementById("birds-audio");
+    birdsAudio.volume = 0;
+  }
+
+  function fadeBirdsVolume(target, duration) {
+    if (!birdsAudio) return;
+    if (birdsFadeInterval) clearInterval(birdsFadeInterval);
+    var start = birdsAudio.volume, diff = target - start;
+    if (Math.abs(diff) < 0.01) { birdsAudio.volume = target; return; }
+    var steps = Math.ceil(duration / 20), step = 0;
+    birdsFadeInterval = setInterval(function () {
+      step++;
+      var vol = start + diff * (step / steps);
+      birdsAudio.volume = Math.max(0, Math.min(1, vol));
+      if (step >= steps) { clearInterval(birdsFadeInterval); birdsFadeInterval = null; }
+    }, 20);
+  }
+
+  function startBirds() {
+    initBirdsAudio();
+    birdsAudio.volume = 0;
+    var p = birdsAudio.play();
+    if (p && p.catch) p.catch(function (err) {
+      console.error("Birds play failed:", err);
+      setStatus("Birds: tap to enable audio");
+    });
+    fadeBirdsVolume(birdsVolume, 3000);
+  }
+
+  function stopBirds() {
+    if (!birdsAudio) return;
+    fadeBirdsVolume(0, 500);
+    setTimeout(function () { if (!birdsOn && birdsAudio) birdsAudio.pause(); }, 600);
+  }
+
+  function toggleBirds() {
+    birdsOn = !birdsOn;
+    document.getElementById("birds-btn").innerHTML = "&#128330; Birds" + (birdsOn ? ": ON" : "");
+    document.getElementById("birds-vol").classList.toggle("show", birdsOn);
+    if (birdsOn) startBirds(); else stopBirds();
+    saveState();
+  }
+
+  function handleBirdsVolume(e) {
+    birdsVolume = e.target.value / 100;
+    if (birdsOn && birdsAudio) birdsAudio.volume = birdsVolume;
+    saveState();
+  }
+
+  /* ── Theme ── */
+
+  var THEME_CLASSES = ["morning", "day", "sunset"];
+
+  function getTimeTheme() {
+    var h = new Date().getHours();
+    if (h >= 6 && h < 10) return "morning";
+    if (h >= 10 && h < 17) return "day";
+    if (h >= 17 && h < 20) return "sunset";
+    return "";
+  }
+
+  function resolveThemeClass() {
+    if (themeMode === "auto") return getTimeTheme();
+    if (themeMode === "night") return "";
+    return themeMode;
+  }
+
+  function applyTheme() {
+    var cls = resolveThemeClass();
+    if (cls === currentThemeClass) return;
+    THEME_CLASSES.forEach(function (c) { document.body.classList.remove(c); });
+    if (cls) document.body.classList.add(cls);
+    currentThemeClass = cls;
+    updatePickerActive();
+  }
+
+  function setTheme(mode) {
+    themeMode = mode;
+    currentThemeClass = "~force~";
+    applyTheme();
+    saveState();
+    closeThemePicker();
+  }
+
+  function toggleThemePicker() {
+    var picker = document.getElementById("theme-picker");
+    picker.classList.toggle("show");
+  }
+
+  function closeThemePicker() {
+    document.getElementById("theme-picker").classList.remove("show");
+  }
+
+  function updatePickerActive() {
+    var btns = document.querySelectorAll(".theme-option");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle("active", btns[i].getAttribute("data-theme") === themeMode);
+    }
+  }
+
   /* ── Rain Canvas ── */
 
   var rainCanvas = null, rainCtx = null, rainDrops = [], rainSpawning = false;
@@ -410,7 +539,9 @@
       ctx.beginPath();
       ctx.moveTo(drop.x, drop.y);
       ctx.lineTo(drop.x - drop.len * 0.15, drop.y + drop.len);
-      ctx.strokeStyle = "rgba(200,210,230," + drop.opacity + ")";
+      ctx.strokeStyle = currentThemeClass
+        ? "rgba(100,110,140," + (drop.opacity * 1.8) + ")"
+        : "rgba(200,210,230," + drop.opacity + ")";
       ctx.lineWidth = 1;
       ctx.stroke();
     }
@@ -916,6 +1047,13 @@
     document.getElementById("rain-vol").classList.add("show");
   }
   document.getElementById("rain-vol").value = Math.round(rainVolume * 100);
+  if (birdsOn) {
+    document.getElementById("birds-btn").innerHTML = "&#128330; Birds: ON";
+    document.getElementById("birds-vol").classList.add("show");
+  }
+  document.getElementById("birds-vol").value = Math.round(birdsVolume * 100);
+  applyTheme();
+  setInterval(applyTheme, 60000);
 
   // Load YouTube IFrame API
   loadYouTubeAPI();
@@ -926,8 +1064,15 @@
   document.getElementById("shuffle-btn").addEventListener("click", toggleShuffle);
   document.getElementById("rain-btn").addEventListener("click", toggleRain);
   document.getElementById("rain-vol").addEventListener("input", handleRainVolume);
-  document.getElementById("restart-btn").addEventListener("click", handleRestart);
-  document.getElementById("next-btn").addEventListener("click", handleNext);
+  document.getElementById("birds-btn").addEventListener("click", toggleBirds);
+  document.getElementById("birds-vol").addEventListener("input", handleBirdsVolume);
+  document.getElementById("theme-toggle").addEventListener("click", toggleThemePicker);
+  document.querySelectorAll(".theme-option").forEach(function (btn) {
+    btn.addEventListener("click", function () { setTheme(this.getAttribute("data-theme")); });
+  });
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest(".theme-fab") && !e.target.closest(".theme-picker")) closeThemePicker();
+  });
   document.getElementById("set-range-btn").addEventListener("click", handleSetRange);
   document.getElementById("clear-range-btn").addEventListener("click", handleClearRange);
   var shareBtn = document.getElementById("share-btn");
@@ -959,8 +1104,8 @@
     if (e.key === "Enter") handlePlay();
   });
 
-  // Auto-start rain if it was saved as ON (share link already started it)
   if (rainOn) startRain();
+  if (birdsOn) startBirds();
 
   syncQueueHeight();
   initDragListeners();
