@@ -237,21 +237,17 @@
     playlist = data.videos;
     currentIndex = 0;
     loadedFromShare = true;
-    if (data.rain && !rainOn) {
-      rainOn = true;
-      document.getElementById("rain-btn").innerHTML = "&#127783; Rain: ON";
-      document.getElementById("rain-vol").classList.add("show");
-    }
+    rainOn = data.rain;
+    document.getElementById("rain-btn").innerHTML = "&#127783; Rain" + (rainOn ? ": ON" : "");
+    document.getElementById("rain-vol").classList.toggle("show", rainOn);
     if (data.rainVol !== null) {
       rainVolume = data.rainVol;
       document.getElementById("rain-vol").value = Math.round(rainVolume * 100);
       if (rainAudio) rainAudio.volume = rainVolume;
     }
-    if (data.birds && !birdsOn) {
-      birdsOn = true;
-      document.getElementById("birds-btn").innerHTML = "&#128330; Birds: ON";
-      document.getElementById("birds-vol").classList.add("show");
-    }
+    birdsOn = data.birds;
+    document.getElementById("birds-btn").innerHTML = "&#128330; Birds" + (birdsOn ? ": ON" : "");
+    document.getElementById("birds-vol").classList.toggle("show", birdsOn);
     if (data.birdsVol !== null) {
       birdsVolume = data.birdsVol;
       document.getElementById("birds-vol").value = Math.round(birdsVolume * 100);
@@ -262,8 +258,8 @@
     if (label) label.textContent = playlistTitle;
     var btnText = document.querySelector(".share-btn-text");
     if (btnText) btnText.textContent = playlistTitle;
-    if (rainOn) startRain();
-    if (birdsOn) startBirds();
+    if (rainOn) startRain(); else stopRain();
+    if (birdsOn) startBirds(); else stopBirds();
     history.replaceState(null, "", window.location.pathname);
     renderPlaylist();
     if (player && player.loadVideoById) {
