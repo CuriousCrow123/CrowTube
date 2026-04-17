@@ -65,6 +65,8 @@
   var rainVolume = 0.3;           // Rain volume (0–1)
   var rainFadeInterval = null;    // Rain volume fade interval ID
 
+  var playlistTitle = "Queue";    // User-editable playlist name
+
   var advancing = false;          // Guard against re-entrance in advanceQueue
   var rangeCheckStopping = false; // Guard for range-check stop race condition
 
@@ -74,7 +76,8 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         pl: playlist, ci: currentIndex, loop: loopEnabled,
-        shuffle: shuffleEnabled, rainOn: rainOn, rainVol: rainVolume
+        shuffle: shuffleEnabled, rainOn: rainOn, rainVol: rainVolume,
+        title: playlistTitle
       }));
     } catch (e) {}
   }
@@ -89,6 +92,7 @@
         if (typeof data.shuffle === "boolean") shuffleEnabled = data.shuffle;
         if (typeof data.rainOn === "boolean") rainOn = data.rainOn;
         if (typeof data.rainVol === "number") rainVolume = data.rainVol;
+        if (typeof data.title === "string") playlistTitle = data.title;
       }
     } catch (e) {}
   }
@@ -155,6 +159,7 @@
       parts.push(part);
     }
     var hash = parts.join("|");
+    if (playlistTitle && playlistTitle !== "Queue") hash += "&t=" + encodeURIComponent(playlistTitle);
     if (rainOn) hash += "&rain=1&rvol=" + Math.round(rainVolume * 100);
     return hash;
   }
@@ -189,7 +194,8 @@
     if (!result.length) return null;
     var rvol = flags.rvol !== undefined ? Number(flags.rvol) / 100 : null;
     if (rvol !== null && (isNaN(rvol) || rvol < 0 || rvol > 1)) rvol = null;
-    return { videos: result, rain: flags.rain === "1", rainVol: rvol };
+    var title = flags.t ? decodeURIComponent(flags.t) : null;
+    return { videos: result, rain: flags.rain === "1", rainVol: rvol, title: title };
   }
 
   function handleShare() {
@@ -235,6 +241,13 @@
       rainVolume = data.rainVol;
       document.getElementById("rain-vol").value = Math.round(rainVolume * 100);
       if (rainAudio) rainAudio.volume = rainVolume;
+    }
+    if (data.title) {
+      playlistTitle = data.title;
+      var label = document.querySelector(".queue-title.share-label");
+      if (label) label.textContent = playlistTitle;
+      var btnText = document.querySelector(".share-btn-text");
+      if (btnText) btnText.textContent = playlistTitle;
     }
     if (rainOn) startRain();
     history.replaceState(null, "", window.location.pathname);
@@ -767,10 +780,26 @@
   };
 
   function handleClearAll() {
-    playlist = [];
-    currentIndex = -1;
-    renderPlaylist();
-    saveState();
+    var existing = document.querySelector(".confirm-overlay");
+    if (existing) { existing.remove(); return; }
+    var overlay = document.createElement("div");
+    overlay.className = "confirm-overlay";
+    overlay.innerHTML = '<div class="confirm-modal"><div class="confirm-icon">&#128465;</div><div class="confirm-title">Clear Queue</div><div class="confirm-msg">This will remove all videos from your playlist. Are you sure?</div><div class="confirm-actions"><button class="confirm-no">Cancel</button><button class="confirm-yes">Clear All</button></div></div>';
+    document.body.appendChild(overlay);
+    requestAnimationFrame(function () { overlay.classList.add("show"); });
+    function close() {
+      overlay.classList.remove("show");
+      setTimeout(function () { overlay.remove(); }, 250);
+    }
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+    overlay.querySelector(".confirm-yes").addEventListener("click", function () {
+      close();
+      playlist = [];
+      currentIndex = -1;
+      renderPlaylist();
+      saveState();
+    });
+    overlay.querySelector(".confirm-no").addEventListener("click", close);
   }
 
   /* ── Play Range Controls ── */
@@ -918,16 +947,29 @@
   document.getElementById("next-btn").addEventListener("click", handleNext);
   document.getElementById("set-range-btn").addEventListener("click", handleSetRange);
   document.getElementById("clear-range-btn").addEventListener("click", handleClearRange);
-  document.getElementById("share-btn").addEventListener("click", function (e) { e.preventDefault(); handleShare(); });
-  document.getElementById("share-btn").addEventListener("dragstart", function () {
+  var shareBtn = document.getElementById("share-btn");
+  var shareLabel = document.querySelector(".queue-title.share-label");
+  shareBtn.addEventListener("click", function (e) { e.preventDefault(); handleShare(); });
+  var shareBtnText = shareBtn.querySelector(".share-btn-text");
+  shareLabel.textContent = playlistTitle;
+  shareBtnText.textContent = playlistTitle;
+  function syncShareLabel() {
+    playlistTitle = shareLabel.textContent || "Queue";
+    shareBtnText.textContent = playlistTitle;
+    shareBtn.href = buildShareUrl() || "#";
+    saveState();
+  }
+  shareLabel.addEventListener("input", syncShareLabel);
+  shareLabel.addEventListener("blur", syncShareLabel);
+  shareBtn.addEventListener("dragstart", function () {
     var url = buildShareUrl();
-    if (url) {
-      this.href = url;
-      this.innerHTML = "&#128279; CrowTube (" + playlist.length + " video" + (playlist.length !== 1 ? "s" : "") + ")";
-    }
+    if (url) this.href = url;
   });
-  document.getElementById("share-btn").addEventListener("dragend", function () {
-    this.innerHTML = "&#128279; Playlist";
+  shareBtn.addEventListener("dragend", function () {
+    this.href = buildShareUrl() || "#";
+  });
+  shareLabel.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); this.blur(); }
   });
   document.getElementById("clear-all-btn").addEventListener("click", handleClearAll);
   document.getElementById("url-input").addEventListener("keydown", function (e) {
